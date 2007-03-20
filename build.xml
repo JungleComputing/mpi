@@ -1,0 +1,80 @@
+<project name="MPIIbis" default="build" basedir=".">
+    <description>
+	Build file for ibisUtil
+    </description>
+    <!-- Global properties for ibisUtil -->
+    <property name="src" location="src" />
+    <property name="tmp" location="tmp" />
+    <property name="lib" location="lib" />
+    <property name="doc" location="doc" />
+    <property name="external" location="external" />
+    <property name="jar" location="${lib}/ibis-mpi.jar" />
+
+    <property name="java.debug.value" value="true" />
+
+    <path id="external_jars">
+	<fileset dir="${external}">
+	    <include name="*.jar" />
+	</fileset>
+    </path>
+
+    <target name="init">
+	<!-- Create the time stamp -->
+	<tstamp />
+
+	<!-- Create the build directory structure used by compile -->
+	<mkdir dir="${tmp}" />
+	<mkdir dir="${doc}/javadoc" />
+	<mkdir dir="${lib}/include" />
+    </target>
+
+    <target name="compile" depends="init" description="compile the source ">
+	<!-- Compile the java code from ${src} into ${tmp} -->
+	<javac srcdir="${src}" destdir="${tmp}" debug="on" >
+	    <classpath refid="external_jars" />
+	</javac>
+
+	<javah destdir="${lib}/include" classpath="${tmp}">
+	    <class name="ibis.impl.mpi.IbisMPIInterface" />
+	</javah>
+    </target>
+
+    <target name="build" depends="compile" description="build the JAR file">
+	<!-- Create the distribution directory -->
+	<mkdir dir="${lib}" />
+
+	<copy todir="${tmp}">
+	    <fileset dir="${src}" includes="ibis/impl/**/capabilities"/>
+	</copy>
+
+	<!-- Put everything in ${tmp} into the jar file -->
+	<jar jarfile="${jar}" basedir="${tmp}">
+	    <manifest>
+		<attribute name="Ibis-Implementation" value="ibis.impl.mpi.MpiIbis"/>
+	    </manifest>
+	</jar>
+
+	<!-- And delete the build dir -->
+	<delete dir="${tmp}" />
+    </target>
+
+    <target name="dist" depends="build,javadoc" description="build the JAR file and documentation" />
+
+    <target name="javadoc" depends="compile" description="generate all javadocs">
+	<javadoc destdir="${doc}/javadoc" access="public" packagenames="ibis.mpi.*" sourcepath="${src}" overview="src/ibis/mpi/package.html">
+	    <link href="http://java.sun.com/j2se/1.4.2/docs/api/" />
+	</javadoc>
+
+	<!-- And delete the build dir -->
+	<delete dir="${tmp}" />
+    </target>
+
+    <target name="clean" description="clean up">
+	<delete dir="${tmp}"/>
+	<delete dir="${lib}"/>
+    </target>
+
+    <target name="distclean" depends="clean" description="clean up, including docs">
+	<delete dir="${doc}/javadoc" />
+    </target>
+</project>
