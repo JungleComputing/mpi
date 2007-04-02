@@ -12,7 +12,10 @@ import ibis.ipl.CapabilitySet;
 import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
 import ibis.ipl.PortMismatchException;
-import ibis.ipl.ResizeHandler;
+import ibis.ipl.ReceivePortConnectUpcall;
+import ibis.ipl.RegistryEventHandler;
+import ibis.ipl.SendPortDisconnectUpcall;
+import ibis.ipl.Upcall;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
 
@@ -57,7 +60,7 @@ public final class MpiIbis extends ibis.impl.Ibis
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
 
-    public MpiIbis(ResizeHandler r, CapabilitySet p, Properties tp)
+    public MpiIbis(RegistryEventHandler r, CapabilitySet p, Properties tp)
         throws Throwable {
 
         super(r, p, tp, null);
@@ -96,34 +99,26 @@ public final class MpiIbis extends ibis.impl.Ibis
         return bos.toByteArray();
     }
 
-    protected ibis.impl.PortType newPortType(CapabilitySet p, Properties tp) {
-        return new MpiPortType(this, p, tp);
-    }
-
-    public void left(IbisIdentifier[] ids) {
-        super.left(ids);
+    public void left(ibis.ipl.IbisIdentifier id) {
+        super.left(id);
         synchronized(addresses) {
-            for (int i = 0; i < ids.length; i++) {
-                Integer n = map.get(ids[i]);
-                if (n != null) {
-                    addresses[n.intValue()] = null;
-                    ibisIds[n.intValue()] = null;
-                    map.remove(ids[i]);
-                }
+            Integer n = map.get(id);
+            if (n != null) {
+                addresses[n.intValue()] = null;
+                ibisIds[n.intValue()] = null;
+                map.remove(id);
             }
         }
     }
 
-    public void died(IbisIdentifier[] ids) {
-        super.died(ids);
+    public void died(ibis.ipl.IbisIdentifier id) {
+        super.died(id);
         synchronized(addresses) {
-            for (int i = 0; i < ids.length; i++) {
-                Integer n = map.get(ids[i]);
-                if (n != null) {
-                    addresses[n.intValue()] = null;
-                    ibisIds[n.intValue()] = null;
-                    map.remove(ids[i]);
-                }
+            Integer n = map.get(id);
+            if (n != null) {
+                addresses[n.intValue()] = null;
+                ibisIds[n.intValue()] = null;
+                map.remove(id);
             }
         }
     }
@@ -180,7 +175,7 @@ public final class MpiIbis extends ibis.impl.Ibis
 
                 out.writeUTF(name);
                 sp.getIdent().writeTo(out);
-                sp.getType().capabilities().writeTo(out);
+                sp.getType().writeTo(out);
                 out.writeInt(tag);
                 out.flush();
 
@@ -195,7 +190,7 @@ public final class MpiIbis extends ibis.impl.Ibis
                             + " at " + id);
                 case ReceivePort.TYPE_MISMATCH:
                     throw new PortMismatchException(
-                            "Cannot connect ports of different PortTypes");
+                            "Cannot connect ports of different port types");
                 case ReceivePort.DENIED:
                     throw new ConnectionRefusedException(
                             "Receiver denied connection");
@@ -353,5 +348,17 @@ public final class MpiIbis extends ibis.impl.Ibis
         } catch (Throwable e) {
             // Ignore
         }
+    }
+
+    protected ibis.ipl.SendPort doCreateSendPort(CapabilitySet tp, String nm,
+            SendPortDisconnectUpcall cU, boolean connectionDowncalls)
+            throws IOException {
+        return new MpiSendPort(this, tp, nm, connectionDowncalls, cU);
+    }
+
+    protected ibis.ipl.ReceivePort doCreateReceivePort(CapabilitySet tp,
+            String nm, Upcall u, ReceivePortConnectUpcall cU,
+            boolean connectionDowncalls) throws IOException {
+        return new MpiReceivePort(this, tp, nm, u, connectionDowncalls, cU);
     }
 }

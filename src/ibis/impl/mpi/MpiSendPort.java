@@ -13,6 +13,7 @@ import ibis.io.DataOutputStream;
 import ibis.io.DataOutputStreamSplitter;
 import ibis.io.Conversion;
 import ibis.io.SplitterException;
+import ibis.ipl.CapabilitySet;
 import ibis.ipl.SendPortDisconnectUpcall;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     private static int tag = 0;
 
-    MpiSendPort(Ibis ibis, MpiPortType type, String name,
+    MpiSendPort(Ibis ibis, CapabilitySet type, String name,
             boolean connectionDowncalls, SendPortDisconnectUpcall cU)
             throws IOException {
         super(ibis, type, name, cU, connectionDowncalls);
@@ -87,7 +88,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     protected void announceNewMessage() throws IOException {
         out.writeByte(NEW_MESSAGE);
-        if (type.numbered) {
+        if (type.hasCapability(COMMUNICATION_NUMBERED)) {
             out.writeLong(ibis.registry().getSeqno(name));
         }
     }

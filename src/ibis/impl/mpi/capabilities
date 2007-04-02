@@ -16,7 +16,7 @@ receive.timeout:
 receive.pollupcalls:
 receive.autoupcalls:
 receive.explicit:
-resize.upcalls:
+registry.events:
 resize.downcalls:
 # Nickname for MpiIbis.
 nickname:mpi

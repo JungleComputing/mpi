@@ -24,6 +24,8 @@ static int* ibisMPI_typeSize;
 
 static int ibisMPI_currentId;
 
+static int noncopying = 1;
+
 struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
@@ -88,7 +90,6 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
 static struct ibisMPI_buf *getBuf(int sz) {
     struct ibisMPI_buf *p = ibisMPI_bufcache;
     if (p == NULL) {
-	fprintf(stderr, "new buf, sz = %d\n", sz);
 	p = (struct ibisMPI_buf *) malloc(sizeof(struct ibisMPI_buf));
 	if (p == NULL) {
 	    return NULL;
@@ -223,8 +224,46 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_rank
     return ibisMPI_rank;
 }
 
+
+static void freeSendBuffer(JNIEnv *env, jobject buf, jint type, void* bufptr) {
+    if (noncopying) {
+	switch(type) {
+	    case TYPE_BOOLEAN:
+		(*env)->ReleaseBooleanArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_BYTE:
+		(*env)->ReleaseByteArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_CHAR:
+		(*env)->ReleaseCharArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_SHORT:
+		(*env)->ReleaseShortArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_INT:
+		(*env)->ReleaseIntArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_FLOAT:
+		(*env)->ReleaseFloatArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_LONG:
+		(*env)->ReleaseLongArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    case TYPE_DOUBLE:
+		(*env)->ReleaseDoubleArrayElements(env, buf, bufptr, JNI_ABORT);
+		break;
+	    default:
+		fprintf(stderr, "unknown type: %d\n", type);
+		break;
+	}
+    } else {
+	free(bufptr);
+    }    
+}
+
+
 static void* getWholeBuffer(JNIEnv *env, jobject buf, jint type) {
-    jboolean isCopy;
+    jboolean isCopy = -1;
     void *b = NULL;
 
     switch(type) {
@@ -255,6 +294,11 @@ static void* getWholeBuffer(JNIEnv *env, jobject buf, jint type) {
 	default:
 	    fprintf(stderr, "unknown type: %d\n", type);
 	    return NULL;
+    }
+    if (isCopy == JNI_TRUE) {
+	freeSendBuffer(env, buf, type, b);
+	b = NULL;
+	noncopying = 0;
     }
     return b;
 }
@@ -297,60 +341,24 @@ static void* getPartialBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
     return bufptr;
 }
 
+
 static void* getSendBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
 	jint type) {
-    int arrayLen = (*env)->GetArrayLength(env, buf);
 
-    if(offset == 0 && count == arrayLen) {
-	return getWholeBuffer(env, buf, type);
+    if (noncopying) {
+	void *p = getWholeBuffer(env, buf, type);
+	if (noncopying) {
+	    return p;
+	}
     }
     return getPartialBuffer(env, buf, offset, count, type);
 }
+
 
 static struct ibisMPI_buf *getRcvBuffer(JNIEnv *env, jobject buf, jint offset,
 	jint count, jint type) {
     int size = count * ibisMPI_typeSize[type];
     return getBuf(size);
-}
-
-
-static void freeSendBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
-	jint type, void* bufptr) {
-    int arrayLen = (*env)->GetArrayLength(env, buf);
-
-    if(offset == 0 && count == arrayLen) { /* a whole array */
-	switch(type) {
-	    case TYPE_BOOLEAN:
-		(*env)->ReleaseBooleanArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_BYTE:
-		(*env)->ReleaseByteArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_CHAR:
-		(*env)->ReleaseCharArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_SHORT:
-		(*env)->ReleaseShortArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_INT:
-		(*env)->ReleaseIntArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_FLOAT:
-		(*env)->ReleaseFloatArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_LONG:
-		(*env)->ReleaseLongArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_DOUBLE:
-		(*env)->ReleaseDoubleArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    default:
-		fprintf(stderr, "unknown type: %d\n", type);
-		break;
-	}
-    } else {
-	free(bufptr);
-    }    
 }
 
 
@@ -391,6 +399,7 @@ static void freeRcvBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
     releaseBuf(p);
 }
 
+
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_send(JNIEnv *env, jobject jthis,
 	jobject buf, jint offset, jint count,
 	jint type, jint dest, jint tag) {
@@ -407,14 +416,18 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_send(JNIEnv *env, job
 	    ibisMPI_rank, size, dest, tag, type, ibisMPI_typeSize[type]);
 #endif
 
-    res = MPI_Send(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD);
+    if (noncopying) {
+	res = MPI_Send(bufptr + offset*ibisMPI_typeSize[type], size, MPI_BYTE, dest, tag, MPI_COMM_WORLD);
+    } else {
+	res = MPI_Send(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD);
+    }
 
 #if DEBUG	
     fprintf(stderr, "%d: send of %d bytes to %d, tag is %d, type is %d (%d bytes/elt) DONE\n", 
 	    ibisMPI_rank, size, dest, tag, type, ibisMPI_typeSize[type]);
 #endif
 
-    freeSendBuffer(env, buf, offset, count, type, bufptr);
+    freeSendBuffer(env, buf, type, bufptr);
 
     if(res != MPI_SUCCESS) return -1;
 
@@ -469,7 +482,11 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 	    ibisMPI_rank, size, dest, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
-    res = MPI_Isend(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &(req->request));
+    if (noncopying) {
+	res = MPI_Isend(bufptr + offset*ibisMPI_typeSize[type], size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &(req->request));
+    } else {
+	res = MPI_Isend(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &(req->request));
+    }
 
 #if DEBUG
     fprintf(stderr, "%d: Isend of %d bytes to %d, tag is %d, type is %d (%d bytes/elt) ID = %d DONE\n", 
@@ -528,7 +545,7 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
 
     if(flag) { /* send or receive is done */
 	if (req->isSend) {
-	    freeSendBuffer(env, buf, offset, count, type, req->buffer);
+	    freeSendBuffer(env, buf, type, req->buffer);
 	} else {
 	    freeRcvBuffer(env, buf, offset, count, type, req->buffer);
 	}

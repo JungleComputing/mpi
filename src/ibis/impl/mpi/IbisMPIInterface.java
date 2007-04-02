@@ -10,14 +10,20 @@ import ibis.io.SerializationInput;
 import ibis.io.SerializationOutput;
 
 import java.util.Properties;
+import java.util.HashMap;
+import java.util.HashSet;
 
 public class IbisMPIInterface {
 
     static final boolean SINGLE_THREAD = false;
 
-    static final boolean ONE_POLLER = false;
+    static final int MAX_POLLS = 100;
+
+    static final boolean ONE_POLLER = true;
 
     static final boolean DEBUG = false;
+
+    static final int SINGLE_POLLER_NANO_SLEEP_TIME = -1; // don't sleep between polls
 
     static final int NANO_SLEEP_TIME = -1; // don't sleep between polls
 
@@ -78,6 +84,10 @@ public class IbisMPIInterface {
 
     private boolean pollToken = false;
 
+    private HashMap<Integer, Integer> locks = new HashMap<Integer, Integer>();
+
+    private HashSet<Integer> done = new HashSet<Integer>();
+
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
             IbisFactory.loadLibrary("IbisMPIInterface", props);
@@ -110,6 +120,7 @@ public class IbisMPIInterface {
 
     private void nanosleep(int time) {
         if (time <= 0) {
+            Thread.yield();
             return;
         }
         try {
@@ -147,6 +158,10 @@ public class IbisMPIInterface {
 
         // use asynchronous sends
         int id = isend(buf, offset, count, type, dest, tag);
+        return waitOrPoll(id, buf, offset, count, type);
+    }
+
+    private int waitOrPoll(int id, Object buf, int offset, int count, int type) {
 
         if (!ONE_POLLER) {
             while (true) {
@@ -161,37 +176,68 @@ public class IbisMPIInterface {
 
         // there is only one poller thread
 
+        Integer myLock = new Integer(id);
         while (true) {
             boolean iAmPoller = getPollToken();
             if (iAmPoller) {
-                int finishedId = testAll();
-                if (finishedId == id) {
-                    // my operation is done!
-                    // we have to do a test to release buffers
-                    int flag = test(id, buf, offset, count, type);
-                    if (flag == 0) {
-                        throw new Error(
-                            "internal error, testAll returned my id, but test failed");
-                    }
-                    releasePollToken();
-                    return 1;
-                } else if (finishedId >= 0) {
-                    // some operation posted by another thread (not the poller)
-                    // was done. Notify it.
-                    synchronized (this) {
-                        notifyAll();
-                    }
-                } else {
-                    // nothing finished
-                }
+                int polls = MAX_POLLS;
+                while (polls >= 0) {
+                    int finishedId = testAll();
+                    if (finishedId == id) {
+                        // my operation is done!
+                        // we have to do a test to release buffers
+                        int flag = test(id, buf, offset, count, type);
+                        if (flag == 0) {
+                            throw new Error(
+                                "internal error, testAll returned my id, but test failed");
+                        }
+                        releasePollToken();
 
-                nanosleep(NANO_SLEEP_TIME);
+                        synchronized(this) {
+                            for (Integer d : locks.keySet()) {
+                                synchronized(d) {
+                                    d.notifyAll();
+                                }
+                            }
+                        }
+
+                        return 1;
+                    } else if (finishedId >= 0) {
+                        // some operation posted by another thread (not the poller)
+                        // was done. Notify it.
+                        Integer d;
+                        synchronized (this) {
+                            Integer dd = new Integer(finishedId);
+                            d = locks.get(dd);
+                        }
+                        if (d != null) {
+                            synchronized(d) {
+                                done.add(d);
+                                d.notifyAll();
+                            }
+                        }
+                    } else {
+                        // nothing finished
+                    }
+                }
+                nanosleep(SINGLE_POLLER_NANO_SLEEP_TIME);
             } else {
                 // I am not the poller
-                try {
-                    wait();
-                } catch (Exception e) {
-                    // ignore
+                synchronized(this) {
+                    locks.put(myLock, myLock);
+                }
+                synchronized(myLock) {
+                    if (! done.contains(myLock)) {
+                        try {
+                            myLock.wait();
+                        } catch (Exception e) {
+                            // ignore
+                        }
+                    }
+                    done.remove(myLock);
+                }
+                synchronized(this) {
+                    locks.remove(myLock);
                 }
                 
                 // poll once
@@ -219,13 +265,7 @@ public class IbisMPIInterface {
 
         // use asynchronous recv
         int id = irecv(buf, offset, count, type, src, tag);
-        while (true) {
-            int flag = test(id, buf, offset, count, type);
-            if (flag != 0) {
-                return 1;
-            }
-            nanosleep(NANO_SLEEP_TIME);
-        }
+        return waitOrPoll(id, buf, offset, count, type);
     }
 
     private int getBufLen(Object buf, int type) {

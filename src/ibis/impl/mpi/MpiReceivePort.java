@@ -3,7 +3,6 @@
 package ibis.impl.mpi;
 
 import ibis.impl.Ibis;
-import ibis.impl.PortType;
 import ibis.impl.ReadMessage;
 import ibis.impl.ReceivePort;
 import ibis.impl.ReceivePortIdentifier;
@@ -11,6 +10,7 @@ import ibis.impl.ReceivePortConnectionInfo;
 import ibis.impl.SendPortIdentifier;
 import ibis.io.DataInputStream;
 import ibis.io.Conversion;
+import ibis.ipl.CapabilitySet;
 import ibis.ipl.ReceivePortConnectUpcall;
 import ibis.ipl.ReceiveTimedOutException;
 import ibis.ipl.Upcall;
@@ -80,7 +80,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                                 + origin);
                     }
                     message.setFinished(false);
-                    if (type.numbered) {
+                    if (numbered) {
                         message.setSequenceNumber(message.readLong());
                     }
                     ReadMessage m = message;
@@ -133,15 +133,15 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
 
     private boolean reader_busy = false;
 
-    MpiReceivePort(Ibis ibis, MpiPortType type, String name, Upcall upcall,
+    MpiReceivePort(Ibis ibis, CapabilitySet type, String name, Upcall upcall,
             boolean connectionAdministration,
             ReceivePortConnectUpcall connUpcall) {
         super(ibis, type, name, upcall, connUpcall, connectionAdministration);
 
         no_connectionhandler_thread = upcall == null && connUpcall == null
-                && !type.manyToOne
-                && !type.capabilities().hasCapability(RECEIVE_POLL)
-                && !type.capabilities().hasCapability(RECEIVE_TIMEOUT);
+                && type.hasCapability(CONNECTION_ONE_TO_ONE)
+                && !type.hasCapability(RECEIVE_POLL)
+                && !type.hasCapability(RECEIVE_TIMEOUT);
     }
 
     public void messageArrived(ReadMessage msg) {
