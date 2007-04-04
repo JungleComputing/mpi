@@ -3,22 +3,20 @@
 package ibis.impl.mpi;
 
 import ibis.impl.Ibis;
-import ibis.impl.IbisIdentifier;
 import ibis.impl.ReceivePortIdentifier;
 import ibis.impl.SendPort;
 import ibis.impl.SendPortConnectionInfo;
 import ibis.impl.SendPortIdentifier;
 import ibis.impl.WriteMessage;
+import ibis.io.Conversion;
 import ibis.io.DataOutputStream;
 import ibis.io.DataOutputStreamSplitter;
-import ibis.io.Conversion;
 import ibis.io.SplitterException;
 import ibis.ipl.CapabilitySet;
 import ibis.ipl.SendPortDisconnectUpcall;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.Socket;
 
 final class MpiSendPort extends SendPort implements MpiProtocol {
 
@@ -42,13 +40,13 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     private static int tag = 0;
 
     MpiSendPort(Ibis ibis, CapabilitySet type, String name,
-            boolean connectionDowncalls, SendPortDisconnectUpcall cU)
-            throws IOException {
-        super(ibis, type, name, cU, connectionDowncalls);
+            SendPortDisconnectUpcall cU) throws IOException {
+        super(ibis, type, name, cU);
 
-        splitter = new DataOutputStreamSplitter(connectionDowncalls
-                || (cU != null));
-
+        splitter = new DataOutputStreamSplitter(
+                ! type.hasCapability(CONNECTION_ONE_TO_ONE)
+                && ! type.hasCapability(CONNECTION_MANY_TO_ONE));
+ 
         initStream(splitter);
     }
 

@@ -5,38 +5,27 @@ package ibis.impl.mpi;
 import ibis.impl.Ibis;
 import ibis.impl.ReadMessage;
 import ibis.impl.ReceivePort;
-import ibis.impl.ReceivePortIdentifier;
 import ibis.impl.ReceivePortConnectionInfo;
+import ibis.impl.ReceivePortIdentifier;
 import ibis.impl.SendPortIdentifier;
-import ibis.io.DataInputStream;
 import ibis.io.Conversion;
+import ibis.io.DataInputStream;
 import ibis.ipl.CapabilitySet;
 import ibis.ipl.ReceivePortConnectUpcall;
-import ibis.ipl.ReceiveTimedOutException;
 import ibis.ipl.Upcall;
 import ibis.util.ThreadPool;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.Socket;
-
-import org.apache.log4j.Logger;
 
 class MpiReceivePort extends ReceivePort implements MpiProtocol {
-
-    private static final Logger logger
-            = Logger.getLogger("ibis.impl.mpi.MpiReceivePort");
 
     class ConnectionHandler extends ReceivePortConnectionInfo 
             implements Runnable, MpiProtocol {
 
-        private final int tag;
-
-        ConnectionHandler(SendPortIdentifier origin, int tag,
+        ConnectionHandler(SendPortIdentifier origin,
                 ReceivePort port, DataInputStream in)
                 throws IOException {
             super(origin, port, in);
-            this.tag = tag;
         }
 
         public void close(Throwable e) {
@@ -134,9 +123,8 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
     private boolean reader_busy = false;
 
     MpiReceivePort(Ibis ibis, CapabilitySet type, String name, Upcall upcall,
-            boolean connectionAdministration,
             ReceivePortConnectUpcall connUpcall) {
-        super(ibis, type, name, upcall, connUpcall, connectionAdministration);
+        super(ibis, type, name, upcall, connUpcall);
 
         no_connectionhandler_thread = upcall == null && connUpcall == null
                 && type.hasCapability(CONNECTION_ONE_TO_ONE)
@@ -234,7 +222,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
     synchronized void connect(SendPortIdentifier origin, int tag, int rank)
             throws IOException {
         DataInputStream in = new MpiDataInputStream(rank, tag);
-        ConnectionHandler conn = new ConnectionHandler(origin, tag, this, in);
+        ConnectionHandler conn = new ConnectionHandler(origin, this, in);
         if (! no_connectionhandler_thread) {
             ThreadPool.createNew(conn, "ConnectionHandler");
         }

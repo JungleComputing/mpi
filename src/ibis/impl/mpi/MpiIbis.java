@@ -22,7 +22,6 @@ import ibis.util.ThreadPool;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.InputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -164,7 +163,6 @@ public final class MpiIbis extends ibis.impl.Ibis
 
         do {
             DataOutputStream out = null;
-            InputStream in = null;
             Socket s = null;
             int result = -1;
 
@@ -351,14 +349,13 @@ public final class MpiIbis extends ibis.impl.Ibis
     }
 
     protected ibis.ipl.SendPort doCreateSendPort(CapabilitySet tp, String nm,
-            SendPortDisconnectUpcall cU, boolean connectionDowncalls)
+            SendPortDisconnectUpcall cU)
             throws IOException {
-        return new MpiSendPort(this, tp, nm, connectionDowncalls, cU);
+        return new MpiSendPort(this, tp, nm, cU);
     }
 
     protected ibis.ipl.ReceivePort doCreateReceivePort(CapabilitySet tp,
-            String nm, Upcall u, ReceivePortConnectUpcall cU,
-            boolean connectionDowncalls) throws IOException {
-        return new MpiReceivePort(this, tp, nm, u, connectionDowncalls, cU);
+            String nm, Upcall u, ReceivePortConnectUpcall cU) throws IOException {
+        return new MpiReceivePort(this, tp, nm, u, cU);
     }
 }
