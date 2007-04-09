@@ -2,22 +2,23 @@
 
 package ibis.impl.mpi;
 
-import ibis.impl.IbisIdentifier;
-import ibis.impl.ReceivePort;
-import ibis.impl.SendPortIdentifier;
-import ibis.io.BufferedArrayInputStream;
-import ibis.io.BufferedArrayOutputStream;
 import ibis.ipl.AlreadyConnectedException;
-import ibis.ipl.CapabilitySet;
 import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
+import ibis.ipl.IbisCapabilities;
+import ibis.ipl.MessageUpcall;
 import ibis.ipl.PortMismatchException;
+import ibis.ipl.PortType;
 import ibis.ipl.ReceivePortConnectUpcall;
 import ibis.ipl.RegistryEventHandler;
 import ibis.ipl.SendPortDisconnectUpcall;
-import ibis.ipl.Upcall;
+import ibis.ipl.impl.IbisIdentifier;
+import ibis.ipl.impl.ReceivePort;
+import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
+import ibis.util.io.BufferedArrayInputStream;
+import ibis.util.io.BufferedArrayOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -36,8 +37,37 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-public final class MpiIbis extends ibis.impl.Ibis
+public final class MpiIbis extends ibis.ipl.impl.Ibis
         implements Runnable, MpiProtocol {
+
+    static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
+            IbisCapabilities.WORLDMODEL_OPEN,
+            IbisCapabilities.WORLDMODEL_CLOSED,
+            IbisCapabilities.REGISTRY_DOWNCALLS,
+            IbisCapabilities.REGISTRY_UPCALLS,
+            "nickname.mpi"
+        );
+
+        static final PortType portCapabilities = new PortType(
+            PortType.SERIALIZATION_OBJECT,
+            PortType.SERIALIZATION_DATA,
+            PortType.SERIALIZATION_BYTE,
+            PortType.SERIALIZATION_REPLACER + "=*",
+            PortType.COMMUNICATION_FIFO,
+            PortType.COMMUNICATION_NUMBERED,
+            PortType.COMMUNICATION_RELIABLE,
+            PortType.CONNECTION_DOWNCALLS,
+            PortType.CONNECTION_UPCALLS,
+            PortType.CONNECTION_TIMEOUT,
+            PortType.CONNECTION_MANY_TO_ONE,
+            PortType.CONNECTION_ONE_TO_MANY,
+            PortType.CONNECTION_ONE_TO_ONE,
+            PortType.RECEIVE_POLL,
+            PortType.RECEIVE_AUTO_UPCALLS,
+            PortType.RECEIVE_EXPLICIT,
+            PortType.RECEIVE_POLL_UPCALLS,
+            PortType.RECEIVE_TIMEOUT
+        );
 
     private static final Logger logger
             = Logger.getLogger("ibis.impl.mpi.MpiIbis");
@@ -59,14 +89,22 @@ public final class MpiIbis extends ibis.impl.Ibis
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
 
-    public MpiIbis(RegistryEventHandler r, CapabilitySet p, Properties tp)
+    public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp)
         throws Throwable {
 
-        super(r, p, tp, null);
+        super(r, p, types, tp, null);
 
         ThreadPool.createNew(this, "MpiIbis");
     }
-
+    
+    protected PortType getPortCapabilities() {
+        return portCapabilities;
+    }
+    
+    protected IbisCapabilities getCapabilities() {
+        return ibisCapabilities;
+    }
+    
     protected byte[] getData() throws IOException {
         InetAddress addr = IPUtils.getLocalHostAddress();
         if (addr == null) {
@@ -146,7 +184,7 @@ public final class MpiIbis extends ibis.impl.Ibis
         return idAddr;
     }
 
-    int connect(MpiSendPort sp, ibis.impl.ReceivePortIdentifier rip,
+    int connect(MpiSendPort sp, ibis.ipl.impl.ReceivePortIdentifier rip,
             int timeout, int tag) throws IOException {
         IbisIdentifier id = (IbisIdentifier) rip.ibis();
         String name = rip.name();
@@ -169,7 +207,7 @@ public final class MpiIbis extends ibis.impl.Ibis
             try {
                 s = createClientSocket(local, idAddr, timeout);
                 out = new DataOutputStream(new BufferedArrayOutputStream(
-                            s.getOutputStream()));
+                            s.getOutputStream(), 4096));
 
                 out.writeUTF(name);
                 sp.getIdent().writeTo(out);
@@ -248,14 +286,14 @@ public final class MpiIbis extends ibis.impl.Ibis
         }
 
         BufferedArrayInputStream bais
-                = new BufferedArrayInputStream(s.getInputStream());
+                = new BufferedArrayInputStream(s.getInputStream(), 4096);
 
         DataInputStream in = new DataInputStream(bais);
         OutputStream out = s.getOutputStream();
 
         String name = in.readUTF();
         SendPortIdentifier send = new SendPortIdentifier(in);
-        CapabilitySet sp = new CapabilitySet(in);
+        PortType sp = new PortType(in);
         int tag = in.readInt();
 
         // First, lookup receiveport.
@@ -348,14 +386,14 @@ public final class MpiIbis extends ibis.impl.Ibis
         }
     }
 
-    protected ibis.ipl.SendPort doCreateSendPort(CapabilitySet tp, String nm,
+    protected ibis.ipl.SendPort doCreateSendPort(PortType tp, String nm,
             SendPortDisconnectUpcall cU)
             throws IOException {
         return new MpiSendPort(this, tp, nm, cU);
     }
 
-    protected ibis.ipl.ReceivePort doCreateReceivePort(CapabilitySet tp,
-            String nm, Upcall u, ReceivePortConnectUpcall cU) throws IOException {
+    protected ibis.ipl.ReceivePort doCreateReceivePort(PortType tp,
+            String nm, MessageUpcall u, ReceivePortConnectUpcall cU) throws IOException {
         return new MpiReceivePort(this, tp, nm, u, cU);
     }
 }

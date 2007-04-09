@@ -2,18 +2,18 @@
 
 package ibis.impl.mpi;
 
-import ibis.impl.Ibis;
-import ibis.impl.ReceivePortIdentifier;
-import ibis.impl.SendPort;
-import ibis.impl.SendPortConnectionInfo;
-import ibis.impl.SendPortIdentifier;
-import ibis.impl.WriteMessage;
-import ibis.io.Conversion;
-import ibis.io.DataOutputStream;
-import ibis.io.DataOutputStreamSplitter;
-import ibis.io.SplitterException;
-import ibis.ipl.CapabilitySet;
+import ibis.ipl.PortType;
 import ibis.ipl.SendPortDisconnectUpcall;
+import ibis.ipl.impl.Ibis;
+import ibis.ipl.impl.ReceivePortIdentifier;
+import ibis.ipl.impl.SendPort;
+import ibis.ipl.impl.SendPortConnectionInfo;
+import ibis.ipl.impl.SendPortIdentifier;
+import ibis.ipl.impl.WriteMessage;
+import ibis.util.io.Conversion;
+import ibis.util.io.DataOutputStream;
+import ibis.util.io.DataOutputStreamSplitter;
+import ibis.util.io.SplitterException;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -39,13 +39,13 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     private static int tag = 0;
 
-    MpiSendPort(Ibis ibis, CapabilitySet type, String name,
+    MpiSendPort(Ibis ibis, PortType type, String name,
             SendPortDisconnectUpcall cU) throws IOException {
         super(ibis, type, name, cU);
 
         splitter = new DataOutputStreamSplitter(
-                ! type.hasCapability(CONNECTION_ONE_TO_ONE)
-                && ! type.hasCapability(CONNECTION_MANY_TO_ONE));
+                ! type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                && ! type.hasCapability(PortType.CONNECTION_MANY_TO_ONE));
  
         initStream(splitter);
     }
@@ -86,7 +86,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     protected void announceNewMessage() throws IOException {
         out.writeByte(NEW_MESSAGE);
-        if (type.hasCapability(COMMUNICATION_NUMBERED)) {
+        if (type.hasCapability(PortType.COMMUNICATION_NUMBERED)) {
             out.writeLong(ibis.registry().getSeqno(name));
         }
     }

@@ -3,9 +3,9 @@
  */
 package ibis.impl.mpi;
 
-import java.io.IOException;
+import ibis.util.io.DataOutputStream;
 
-import ibis.io.DataOutputStream;
+import java.io.IOException;
 
 public class MpiDataOutputStream extends DataOutputStream {
     int tag;
@@ -123,5 +123,10 @@ public class MpiDataOutputStream extends DataOutputStream {
     public void write(int value) throws IOException {
         tmpByte[0] = (byte)value;
         mpi.doSend(tmpByte, 0, 1, IbisMPIInterface.TYPE_BYTE, destRank, tag);
+    }
+
+    @Override
+    public int bufferSize() {
+        return -1;
     }
 }

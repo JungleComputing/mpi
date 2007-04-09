@@ -3,7 +3,7 @@
  */
 package ibis.impl.mpi;
 
-import ibis.io.DataInputStream;
+import ibis.util.io.DataInputStream;
 
 import java.io.IOException;
 
@@ -158,5 +158,10 @@ public class MpiDataInputStream extends DataInputStream {
             throws IOException {
         return mpi.doRecv(destination, offset, length,
                 IbisMPIInterface.TYPE_BYTE, srcRank, srcTag);
+    }
+
+    @Override
+    public int bufferSize() {
+        return -1;
     }
 }

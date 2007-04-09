@@ -2,18 +2,18 @@
 
 package ibis.impl.mpi;
 
-import ibis.impl.Ibis;
-import ibis.impl.ReadMessage;
-import ibis.impl.ReceivePort;
-import ibis.impl.ReceivePortConnectionInfo;
-import ibis.impl.ReceivePortIdentifier;
-import ibis.impl.SendPortIdentifier;
-import ibis.io.Conversion;
-import ibis.io.DataInputStream;
-import ibis.ipl.CapabilitySet;
+import ibis.ipl.MessageUpcall;
+import ibis.ipl.PortType;
 import ibis.ipl.ReceivePortConnectUpcall;
-import ibis.ipl.Upcall;
+import ibis.ipl.impl.Ibis;
+import ibis.ipl.impl.ReadMessage;
+import ibis.ipl.impl.ReceivePort;
+import ibis.ipl.impl.ReceivePortConnectionInfo;
+import ibis.ipl.impl.ReceivePortIdentifier;
+import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.ThreadPool;
+import ibis.util.io.Conversion;
+import ibis.util.io.DataInputStream;
 
 import java.io.IOException;
 
@@ -122,14 +122,14 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
 
     private boolean reader_busy = false;
 
-    MpiReceivePort(Ibis ibis, CapabilitySet type, String name, Upcall upcall,
+    MpiReceivePort(Ibis ibis, PortType type, String name, MessageUpcall upcall,
             ReceivePortConnectUpcall connUpcall) {
         super(ibis, type, name, upcall, connUpcall);
 
         no_connectionhandler_thread = upcall == null && connUpcall == null
-                && type.hasCapability(CONNECTION_ONE_TO_ONE)
-                && !type.hasCapability(RECEIVE_POLL)
-                && !type.hasCapability(RECEIVE_TIMEOUT);
+                && type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                && !type.hasCapability(PortType.RECEIVE_POLL)
+                && !type.hasCapability(PortType.RECEIVE_TIMEOUT);
     }
 
     public void messageArrived(ReadMessage msg) {
