@@ -43,10 +43,6 @@
 	<!-- Create the distribution directory -->
 	<mkdir dir="${lib}" />
 
-	<copy todir="${tmp}">
-	    <fileset dir="${src}" includes="ibis/impl/**/capabilities"/>
-	</copy>
-
 	<!-- Put everything in ${tmp} into the jar file -->
 	<jar jarfile="${jar}" basedir="${tmp}">
 	    <manifest>
