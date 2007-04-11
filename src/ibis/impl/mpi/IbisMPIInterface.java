@@ -88,7 +88,13 @@ class IbisMPIInterface {
 
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
-            System.loadLibrary("IbisMPIInterface");
+            String libPath = props.getProperty("ibis.mpi.libpath");
+            String sep = System.getProperty("file.separator");
+
+            if (libPath != null) {
+                String s = System.mapLibraryName("IbisMPIInterface");
+                System.load(libPath + sep + s);
+            }
             instance = new IbisMPIInterface();
         }
         return instance;
