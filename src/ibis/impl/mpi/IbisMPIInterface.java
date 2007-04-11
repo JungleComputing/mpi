@@ -3,7 +3,6 @@
  */
 package ibis.impl.mpi;
 
-import ibis.ipl.IbisFactory;
 import ibis.util.io.SerializationBase;
 import ibis.util.io.SerializationInput;
 import ibis.util.io.SerializationOutput;
@@ -12,7 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
 
-public class IbisMPIInterface {
+class IbisMPIInterface {
 
     static final boolean SINGLE_THREAD = false;
 
@@ -28,23 +27,23 @@ public class IbisMPIInterface {
 
     // static final int NANO_SLEEP_TIME = 10 * 1000; // 10 us
 
-    public static final int TYPE_BOOLEAN = 1;
+    static final int TYPE_BOOLEAN = 1;
+    
+    static final int TYPE_BYTE = 2;
 
-    public static final int TYPE_BYTE = 2;
+    static final int TYPE_CHAR = 3;
 
-    public static final int TYPE_CHAR = 3;
+    static final int TYPE_SHORT = 4;
 
-    public static final int TYPE_SHORT = 4;
+    static final int TYPE_INT = 5;
 
-    public static final int TYPE_INT = 5;
+    static final int TYPE_FLOAT = 6;
 
-    public static final int TYPE_FLOAT = 6;
+    static final int TYPE_LONG = 7;
 
-    public static final int TYPE_LONG = 7;
+    static final int TYPE_DOUBLE = 8;
 
-    public static final int TYPE_DOUBLE = 8;
-
-    public static final int TYPE_COUNT = 9;
+    static final int TYPE_COUNT = 9;
 
     private synchronized native int init();
 
@@ -54,19 +53,19 @@ public class IbisMPIInterface {
 
     private synchronized native void end();
 
-    public synchronized native int send(Object buf, int offset, int count,
+    synchronized native int send(Object buf, int offset, int count,
         int type, int dest, int tag);
 
-    public synchronized native int isend(Object buf, int offset, int count,
+    synchronized native int isend(Object buf, int offset, int count,
         int type, int dest, int tag);
 
-    public synchronized native int recv(Object buf, int offset, int count,
+    synchronized native int recv(Object buf, int offset, int count,
         int type, int src, int tag);
 
-    public synchronized native int irecv(Object buf, int offset, int count,
+    synchronized native int irecv(Object buf, int offset, int count,
         int type, int src, int tag);
 
-    public synchronized native int test(int id, Object buf, int offset,
+    synchronized native int test(int id, Object buf, int offset,
         int count, int type);
 
     /** 
@@ -89,7 +88,7 @@ public class IbisMPIInterface {
 
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
-            IbisFactory.loadLibrary("IbisMPIInterface", props);
+            System.loadLibrary("IbisMPIInterface");
             instance = new IbisMPIInterface();
         }
         return instance;
@@ -141,7 +140,7 @@ public class IbisMPIInterface {
         pollToken = false;
     }
 
-    public int doSend(Object buf, int offset, int count, int type, int dest,
+    int doSend(Object buf, int offset, int count, int type, int dest,
         int tag) {
         if (DEBUG) {
             System.err
@@ -248,7 +247,7 @@ public class IbisMPIInterface {
         } // end of while
     }
 
-    public int doRecv(Object buf, int offset, int count, int type, int src,
+    int doRecv(Object buf, int offset, int count, int type, int src,
         int tag) {
         if (DEBUG) {
             System.err
@@ -291,6 +290,10 @@ public class IbisMPIInterface {
         }
     }
 
+    /**
+     * Test main entry.
+     * @param args program arguments.
+     */
     public static void main(String[] args) {
 
         boolean verify = true;
