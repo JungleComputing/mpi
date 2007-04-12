@@ -16,6 +16,7 @@ import ibis.util.io.Conversion;
 import ibis.util.io.DataInputStream;
 
 import java.io.IOException;
+import java.util.Properties;
 
 class MpiReceivePort extends ReceivePort implements MpiProtocol {
 
@@ -123,8 +124,8 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
     private boolean reader_busy = false;
 
     MpiReceivePort(Ibis ibis, PortType type, String name, MessageUpcall upcall,
-            ReceivePortConnectUpcall connUpcall) {
-        super(ibis, type, name, upcall, connUpcall);
+            ReceivePortConnectUpcall connUpcall, Properties props) {
+        super(ibis, type, name, upcall, connUpcall, props);
 
         no_connectionhandler_thread = upcall == null && connUpcall == null
                 && type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)

@@ -17,6 +17,7 @@ import ibis.util.io.SplitterException;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Properties;
 
 final class MpiSendPort extends SendPort implements MpiProtocol {
 
@@ -40,8 +41,8 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     private static int tag = 0;
 
     MpiSendPort(Ibis ibis, PortType type, String name,
-            SendPortDisconnectUpcall cU) throws IOException {
-        super(ibis, type, name, cU);
+            SendPortDisconnectUpcall cU, Properties props) throws IOException {
+        super(ibis, type, name, cU, props);
 
         splitter = new DataOutputStreamSplitter(
                 ! type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)

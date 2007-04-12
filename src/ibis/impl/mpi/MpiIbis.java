@@ -386,13 +386,13 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     }
 
     protected ibis.ipl.SendPort doCreateSendPort(PortType tp, String nm,
-            SendPortDisconnectUpcall cU)
+            SendPortDisconnectUpcall cU, Properties props)
             throws IOException {
-        return new MpiSendPort(this, tp, nm, cU);
+        return new MpiSendPort(this, tp, nm, cU, props);
     }
 
     protected ibis.ipl.ReceivePort doCreateReceivePort(PortType tp,
-            String nm, MessageUpcall u, ReceivePortConnectUpcall cU) throws IOException {
-        return new MpiReceivePort(this, tp, nm, u, cU);
+            String nm, MessageUpcall u, ReceivePortConnectUpcall cU, Properties props) throws IOException {
+        return new MpiReceivePort(this, tp, nm, u, cU, props);
     }
 }
