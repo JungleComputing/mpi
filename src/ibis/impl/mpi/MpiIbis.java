@@ -187,7 +187,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     int connect(MpiSendPort sp, ibis.ipl.impl.ReceivePortIdentifier rip,
             int timeout, int tag) throws IOException {
         IbisIdentifier id = (IbisIdentifier) rip.ibisIdentifier();
-        String name = rip.receivePortName();
+        String name = rip.name();
         InetSocketAddress idAddr = getAddress(id);
 
         int port = idAddr.getPort();
