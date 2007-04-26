@@ -43,12 +43,12 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         implements RegistryEventHandler, Runnable, MpiProtocol {
 
     static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
-            IbisCapabilities.REGISTRY_WORLDMODEL_CLOSED,
-            IbisCapabilities.REGISTRY_MEMBERSHIPMANAGEMENT,
-            IbisCapabilities.REGISTRY_MEMBERSHIPMANAGEMENT_ORDERED,
-            IbisCapabilities.REGISTRY_MEMBERSHIPMANAGEMENT_RELIABLE,
-            IbisCapabilities.REGISTRY_SIGNALS,
-            IbisCapabilities.REGISTRY_ELECTIONS,
+            IbisCapabilities.CLOSEDWORLD,
+            IbisCapabilities.MEMBERSHIP,
+            IbisCapabilities.MEMBERSHIP_ORDERED,
+            IbisCapabilities.MEMBERSHIP_RELIABLE,
+            IbisCapabilities.SIGNALS,
+            IbisCapabilities.ELECTIONS,
             "nickname.mpi"
         );
 
