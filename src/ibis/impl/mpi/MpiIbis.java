@@ -6,10 +6,12 @@ import ibis.ipl.AlreadyConnectedException;
 import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
 import ibis.ipl.IbisCapabilities;
+import ibis.ipl.IbisConfigurationException;
 import ibis.ipl.MessageUpcall;
 import ibis.ipl.PortMismatchException;
 import ibis.ipl.PortType;
 import ibis.ipl.ReceivePortConnectUpcall;
+import ibis.ipl.impl.Registry;
 import ibis.ipl.RegistryEventHandler;
 import ibis.ipl.SendPortDisconnectUpcall;
 import ibis.ipl.impl.IbisIdentifier;
@@ -38,7 +40,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 public final class MpiIbis extends ibis.ipl.impl.Ibis
-        implements Runnable, MpiProtocol {
+        implements RegistryEventHandler, Runnable, MpiProtocol {
 
     static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
             IbisCapabilities.WORLDMODEL_OPEN,
@@ -85,16 +87,29 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     private IbisIdentifier[] ibisIds;
 
     private InetSocketAddress[] addresses;
-
+    
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
+    
+    private RegistryEventHandler eventHandler;
 
     public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp)
         throws Throwable {
 
         super(r, p, types, tp, null);
-
         ThreadPool.createNew(this, "MpiIbis");
+    }
+    
+    protected Registry initializeRegistry(RegistryEventHandler handler, 
+            IbisCapabilities caps) {
+        eventHandler = handler;
+        try {
+            return Registry.createRegistry(caps, this, properties, 
+                    getData());
+        } catch(Throwable e) {
+            throw new IbisConfigurationException("Could not create registry",
+                    e);
+        }
     }
     
     protected PortType getPortCapabilities() {
@@ -135,9 +150,23 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
 
         return bos.toByteArray();
     }
+    
+    public void joined(ibis.ipl.IbisIdentifier id) {
+        if (eventHandler != null) {
+            eventHandler.joined(id);
+        }
+    }
 
+    public void gotSignal(String sig) {
+        if (eventHandler != null) {
+            eventHandler.gotSignal(sig);
+        }
+    }
+    
     public void left(ibis.ipl.IbisIdentifier id) {
-        super.left(id);
+        if (eventHandler != null) {
+            eventHandler.left(id);
+        }
         synchronized(addresses) {
             Integer n = map.get(id);
             if (n != null) {
@@ -149,7 +178,9 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     }
 
     public void died(ibis.ipl.IbisIdentifier id) {
-        super.died(id);
+        if (eventHandler != null) {
+            eventHandler.died(id);
+        }
         synchronized(addresses) {
             Integer n = map.get(id);
             if (n != null) {
