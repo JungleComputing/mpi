@@ -3,7 +3,7 @@
  */
 package ibis.impl.mpi;
 
-import ibis.util.io.DataInputStream;
+import ibis.io.DataInputStream;
 
 import java.io.IOException;
 

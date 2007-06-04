@@ -3,9 +3,9 @@
  */
 package ibis.impl.mpi;
 
-import ibis.util.io.SerializationBase;
-import ibis.util.io.SerializationInput;
-import ibis.util.io.SerializationOutput;
+import ibis.io.SerializationBase;
+import ibis.io.SerializationInput;
+import ibis.io.SerializationOutput;
 
 import java.util.HashMap;
 import java.util.HashSet;

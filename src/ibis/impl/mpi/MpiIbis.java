@@ -11,16 +11,16 @@ import ibis.ipl.MessageUpcall;
 import ibis.ipl.PortMismatchException;
 import ibis.ipl.PortType;
 import ibis.ipl.ReceivePortConnectUpcall;
-import ibis.ipl.impl.Registry;
 import ibis.ipl.RegistryEventHandler;
 import ibis.ipl.SendPortDisconnectUpcall;
 import ibis.ipl.impl.IbisIdentifier;
 import ibis.ipl.impl.ReceivePort;
+import ibis.ipl.impl.Registry;
 import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
-import ibis.util.io.BufferedArrayInputStream;
-import ibis.util.io.BufferedArrayOutputStream;
+import ibis.io.BufferedArrayInputStream;
+import ibis.io.BufferedArrayOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -97,7 +97,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp)
         throws Throwable {
 
-        super(r, p, types, tp, null);
+        super(r, p, types, tp);
         ThreadPool.createNew(this, "MpiIbis");
     }
     

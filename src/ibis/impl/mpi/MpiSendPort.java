@@ -10,10 +10,10 @@ import ibis.ipl.impl.SendPort;
 import ibis.ipl.impl.SendPortConnectionInfo;
 import ibis.ipl.impl.SendPortIdentifier;
 import ibis.ipl.impl.WriteMessage;
-import ibis.util.io.Conversion;
-import ibis.util.io.DataOutputStream;
-import ibis.util.io.DataOutputStreamSplitter;
-import ibis.util.io.SplitterException;
+import ibis.io.Conversion;
+import ibis.io.DataOutputStream;
+import ibis.io.DataOutputStreamSplitter;
+import ibis.io.SplitterException;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -56,7 +56,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     }
 
     protected SendPortConnectionInfo doConnect(ReceivePortIdentifier receiver,
-            long timeoutMillis) throws IOException {
+            long timeoutMillis, boolean fill) throws IOException {
         int myTag;
         synchronized(this.getClass()) {
             myTag = tag++;

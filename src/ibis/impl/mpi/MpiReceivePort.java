@@ -12,8 +12,8 @@ import ibis.ipl.impl.ReceivePortConnectionInfo;
 import ibis.ipl.impl.ReceivePortIdentifier;
 import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.ThreadPool;
-import ibis.util.io.Conversion;
-import ibis.util.io.DataInputStream;
+import ibis.io.Conversion;
+import ibis.io.DataInputStream;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -124,7 +124,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
     private boolean reader_busy = false;
 
     MpiReceivePort(Ibis ibis, PortType type, String name, MessageUpcall upcall,
-            ReceivePortConnectUpcall connUpcall, Properties props) {
+            ReceivePortConnectUpcall connUpcall, Properties props) throws IOException {
         super(ibis, type, name, upcall, connUpcall, props);
 
         no_connectionhandler_thread = upcall == null && connUpcall == null
