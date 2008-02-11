@@ -2,11 +2,12 @@
 
 package ibis.impl.mpi;
 
+import ibis.io.BufferedArrayInputStream;
+import ibis.io.BufferedArrayOutputStream;
 import ibis.ipl.AlreadyConnectedException;
 import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
 import ibis.ipl.IbisCapabilities;
-import ibis.ipl.IbisConfigurationException;
 import ibis.ipl.MessageUpcall;
 import ibis.ipl.PortMismatchException;
 import ibis.ipl.PortType;
@@ -15,12 +16,9 @@ import ibis.ipl.RegistryEventHandler;
 import ibis.ipl.SendPortDisconnectUpcall;
 import ibis.ipl.impl.IbisIdentifier;
 import ibis.ipl.impl.ReceivePort;
-import ibis.ipl.impl.Registry;
 import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
-import ibis.io.BufferedArrayInputStream;
-import ibis.io.BufferedArrayOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -43,12 +41,10 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         implements RegistryEventHandler, Runnable, MpiProtocol {
 
     static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
-            IbisCapabilities.CLOSEDWORLD,
-            IbisCapabilities.MEMBERSHIP,
-            IbisCapabilities.MEMBERSHIP_ORDERED,
-            IbisCapabilities.MEMBERSHIP_RELIABLE,
+            IbisCapabilities.CLOSED_WORLD,
+            IbisCapabilities.MEMBERSHIP_TOTALLY_ORDERED,
             IbisCapabilities.SIGNALS,
-            IbisCapabilities.ELECTIONS,
+            IbisCapabilities.ELECTIONS_STRICT,
             "nickname.mpi"
         );
 
@@ -99,18 +95,6 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
 
         super(r, p, types, tp);
         ThreadPool.createNew(this, "MpiIbis");
-    }
-    
-    protected Registry initializeRegistry(RegistryEventHandler handler, 
-            IbisCapabilities caps) {
-        eventHandler = handler;
-        try {
-            return Registry.createRegistry(caps, this, properties, 
-                    getData());
-        } catch(Throwable e) {
-            throw new IbisConfigurationException("Could not create registry",
-                    e);
-        }
     }
     
     protected PortType getPortCapabilities() {
@@ -261,9 +245,9 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                 case ReceivePort.DENIED:
                     throw new ConnectionRefusedException(
                             "Receiver denied connection", rip);
-                case ReceivePort.NO_MANYTOONE:
+                case ReceivePort.NO_MANY_TO_X:
                     throw new ConnectionRefusedException(
-                            "Receiver already has a connection and ManyToOne "
+                            "Receiver already has a connection and ManyToOne/ManyToMany "
                             + "is not set", rip);
                 case ReceivePort.NOT_PRESENT:
                 case ReceivePort.DISABLED:
@@ -426,5 +410,9 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     protected ibis.ipl.ReceivePort doCreateReceivePort(PortType tp,
             String nm, MessageUpcall u, ReceivePortConnectUpcall cU, Properties props) throws IOException {
         return new MpiReceivePort(this, tp, nm, u, cU, props);
+    }
+
+    public void electionResult(String electionName, ibis.ipl.IbisIdentifier winner) {
+        // Don't care.
     }
 }

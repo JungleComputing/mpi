@@ -71,7 +71,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
         return c;
     }
 
-    protected void disconnectPort(ReceivePortIdentifier receiver,
+    protected void sendDisconnectMessage(ReceivePortIdentifier receiver,
             SendPortConnectionInfo conn) throws IOException {
 
         out.writeByte(CLOSE_ONE_CONNECTION);
@@ -88,7 +88,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     protected void announceNewMessage() throws IOException {
         out.writeByte(NEW_MESSAGE);
         if (type.hasCapability(PortType.COMMUNICATION_NUMBERED)) {
-            out.writeLong(ibis.registry().getSeqno(name));
+            out.writeLong(ibis.registry().getSequenceNumber(name));
         }
     }
 
