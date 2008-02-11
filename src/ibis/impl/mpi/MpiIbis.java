@@ -38,35 +38,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 public final class MpiIbis extends ibis.ipl.impl.Ibis
-        implements RegistryEventHandler, Runnable, MpiProtocol {
-
-    static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
-            IbisCapabilities.CLOSED_WORLD,
-            IbisCapabilities.MEMBERSHIP_TOTALLY_ORDERED,
-            IbisCapabilities.SIGNALS,
-            IbisCapabilities.ELECTIONS_STRICT,
-            "nickname.mpi"
-        );
-
-        static final PortType portCapabilities = new PortType(
-            PortType.SERIALIZATION_OBJECT,
-            PortType.SERIALIZATION_DATA,
-            PortType.SERIALIZATION_BYTE,
-            PortType.COMMUNICATION_FIFO,
-            PortType.COMMUNICATION_NUMBERED,
-            PortType.COMMUNICATION_RELIABLE,
-            PortType.CONNECTION_DOWNCALLS,
-            PortType.CONNECTION_UPCALLS,
-            PortType.CONNECTION_TIMEOUT,
-            PortType.CONNECTION_MANY_TO_ONE,
-            PortType.CONNECTION_ONE_TO_MANY,
-            PortType.CONNECTION_ONE_TO_ONE,
-            PortType.RECEIVE_POLL,
-            PortType.RECEIVE_AUTO_UPCALLS,
-            PortType.RECEIVE_EXPLICIT,
-            PortType.RECEIVE_POLL_UPCALLS,
-            PortType.RECEIVE_TIMEOUT
-        );
+        implements Runnable, MpiProtocol {
 
     private static final Logger logger
             = Logger.getLogger("ibis.impl.mpi.MpiIbis");
@@ -88,21 +60,10 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
     
-    private RegistryEventHandler eventHandler;
-
-    public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp)
-        throws Throwable {
+    public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp) {
 
         super(r, p, types, tp);
         ThreadPool.createNew(this, "MpiIbis");
-    }
-    
-    protected PortType getPortCapabilities() {
-        return portCapabilities;
-    }
-    
-    protected IbisCapabilities getCapabilities() {
-        return ibisCapabilities;
     }
     
     protected byte[] getData() throws IOException {
@@ -136,46 +97,6 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         return bos.toByteArray();
     }
     
-    public void joined(ibis.ipl.IbisIdentifier id) {
-        if (eventHandler != null) {
-            eventHandler.joined(id);
-        }
-    }
-
-    public void gotSignal(String sig) {
-        if (eventHandler != null) {
-            eventHandler.gotSignal(sig);
-        }
-    }
-    
-    public void left(ibis.ipl.IbisIdentifier id) {
-        if (eventHandler != null) {
-            eventHandler.left(id);
-        }
-        synchronized(addresses) {
-            Integer n = map.get(id);
-            if (n != null) {
-                addresses[n.intValue()] = null;
-                ibisIds[n.intValue()] = null;
-                map.remove(id);
-            }
-        }
-    }
-
-    public void died(ibis.ipl.IbisIdentifier id) {
-        if (eventHandler != null) {
-            eventHandler.died(id);
-        }
-        synchronized(addresses) {
-            Integer n = map.get(id);
-            if (n != null) {
-                addresses[n.intValue()] = null;
-                ibisIds[n.intValue()] = null;
-                map.remove(id);
-            }
-        }
-    }
-
     synchronized InetSocketAddress getAddress(IbisIdentifier id)
             throws IOException {
         Integer v = map.get(id);
@@ -410,9 +331,5 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     protected ibis.ipl.ReceivePort doCreateReceivePort(PortType tp,
             String nm, MessageUpcall u, ReceivePortConnectUpcall cU, Properties props) throws IOException {
         return new MpiReceivePort(this, tp, nm, u, cU, props);
-    }
-
-    public void electionResult(String electionName, ibis.ipl.IbisIdentifier winner) {
-        // Don't care.
     }
 }

@@ -34,6 +34,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         }
 
         public void run() {
+            logger.debug("Started connection handler thread");
             try {
                 reader(false);
             } catch (Throwable e) {
@@ -51,6 +52,9 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         void reader(boolean noThread) throws IOException {
             byte opcode = -1;
 
+            if (in == null) {
+                newStream();
+            }
             while (in != null) {
                 if (logger.isDebugEnabled()) {
                     logger.debug(name + ": handler for " + origin + " woke up");
