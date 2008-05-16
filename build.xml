@@ -30,7 +30,7 @@
 
     <target name="compile" depends="init" description="compile the source ">
 	<!-- Compile the java code from ${src} into ${tmp} -->
-	<javac srcdir="${src}" destdir="${tmp}" debug="on" >
+	<javac srcdir="${src}" destdir="${tmp}" debug="on" source="1.5" target="1.5">
 	    <classpath refid="external_jars" />
 	</javac>
 
@@ -47,7 +47,7 @@
 	<jar jarfile="${jar}" basedir="${tmp}">
 	    <manifest>
 		<attribute name="Ibis-Starter" value="ibis.impl.mpi.MpiIbisStarter"/>
-		<attribute name="Ibis-Version" value="2.0"/>
+		<attribute name="IPL-Version" value="2.0"/>
 		 <attribute name="Implementation-Version" value="${TIMESTAMP}" />
 	    </manifest>
 	</jar>
