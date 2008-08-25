@@ -3,7 +3,7 @@
  */
 package ibis.impl.mpi;
 
-import ibis.io.SerializationBase;
+import ibis.io.SerializationFactory;
 import ibis.io.SerializationInput;
 import ibis.io.SerializationOutput;
 
@@ -315,13 +315,13 @@ class IbisMPIInterface {
         try {
             if (m.rank == 0) {
                 MpiDataOutputStream mout = new MpiDataOutputStream(1, 666);
-                SerializationOutput out = SerializationBase
+                SerializationOutput out = SerializationFactory
                     .createSerializationOutput("ibis", mout);
                 out.writeObject("Hello, world");
                 out.close();
             } else {
                 MpiDataInputStream min = new MpiDataInputStream(0, 666);
-                SerializationInput in = SerializationBase
+                SerializationInput in = SerializationFactory
                     .createSerializationInput("ibis", min);
                 Object o = in.readObject();
                 in.close();
