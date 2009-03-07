@@ -1,6 +1,6 @@
-<project name="MPIIbis" default="build" basedir=".">
+<project name="MpiIbis" default="build" basedir=".">
     <description>
-	Build file for ibisUtil
+	Build file for MpiIbis
     </description>
     <!-- Global properties for ibisUtil -->
     <property name="src" location="src" />
@@ -47,8 +47,8 @@
 	<jar jarfile="${jar}" basedir="${tmp}">
 	    <manifest>
 		<attribute name="Ibis-Starter" value="ibis.impl.mpi.MpiIbisStarter"/>
-		<attribute name="IPL-Version" value="2.0"/>
-		 <attribute name="Implementation-Version" value="${TIMESTAMP}" />
+		<attribute name="Ibis-IPL-Version" value="2.0"/>
+		<attribute name="Ibis-Implementation-Version" value="${TIMESTAMP}" />
 	    </manifest>
 	</jar>
 
