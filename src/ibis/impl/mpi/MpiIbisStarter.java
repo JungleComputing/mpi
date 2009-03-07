@@ -47,23 +47,24 @@ public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
 
     private boolean matching;
     private int unmatchedPortTypes;
-    
-    public MpiIbisStarter() {
-    }
 
-    public boolean matches(IbisCapabilities capabilities, PortType[] types) {
-        this.capabilities = capabilities;
-        this.portTypes = types.clone();
-        matching = true;
+    public MpiIbisStarter(IbisCapabilities caps, PortType[] types,
+            IbisStarterInfo info) {
+        super(caps, types, info);
+        boolean m = true;
         if (! capabilities.matchCapabilities(ibisCapabilities)) {
-            matching = false;
+            m = false;
         }
         for (PortType pt : portTypes) {
             if (! pt.matchCapabilities(portCapabilities)) {
                 unmatchedPortTypes++;
-                matching = false;
+                m = false;
             }
         }
+        matching = m;
+    }
+    
+    public boolean matches() { 
         return matching;
     }
 
@@ -87,8 +88,8 @@ public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
     }
 
     public Ibis startIbis(RegistryEventHandler registryEventHandler,
-            Properties userProperties) {
+            Properties userProperties, String version) {
         return new MpiIbis(registryEventHandler, capabilities, portTypes,
-                userProperties);
+                userProperties, version);
     }
 }

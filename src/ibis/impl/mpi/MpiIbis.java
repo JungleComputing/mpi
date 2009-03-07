@@ -60,9 +60,10 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
     
-    public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp) {
+    public MpiIbis(RegistryEventHandler r, IbisCapabilities p, PortType[] types, Properties tp,
+            String version) {
 
-        super(r, p, types, tp);
+        super(r, p, types, tp, version);
         ThreadPool.createNew(this, "MpiIbis");
     }
     
@@ -186,12 +187,16 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                 throw new ConnectionTimedOutException("Could not connect", rip);
             } finally {
                 try {
-                    out.close();
+                    if (out != null) {
+                        out.close();
+                    }
                 } catch(Throwable e) {
                     // ignored
                 }
                 try {
-                    s.close();
+                    if (s != null) {
+                        s.close();
+                    }
                 } catch(Throwable e) {
                     // ignored
                 }
@@ -250,7 +255,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         out.write(result);
         out.close();
         in.close();
-        if (result == ReceivePort.ACCEPTED) {
+        if (result == ReceivePort.ACCEPTED && rp != null) {
             // add the connection to the receiveport.
             getAddress(send.ibis);
             rp.connect(send, tag, map.get(send.ibis).intValue());
