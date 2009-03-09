@@ -39,6 +39,8 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     final DataOutputStreamSplitter splitter;
 
     private static int tag = 0;
+    
+    private final boolean portNumbered;
 
     MpiSendPort(Ibis ibis, PortType type, String name,
             SendPortDisconnectUpcall cU, Properties props) throws IOException {
@@ -49,6 +51,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
                 && ! type.hasCapability(PortType.CONNECTION_MANY_TO_ONE));
  
         initStream(splitter);
+        portNumbered = type.hasCapability(PortType.COMMUNICATION_NUMBERED);
     }
 
     SendPortIdentifier getIdent() {
@@ -87,7 +90,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     protected void announceNewMessage() throws IOException {
         out.writeByte(NEW_MESSAGE);
-        if (type.hasCapability(PortType.COMMUNICATION_NUMBERED)) {
+        if (portNumbered) {
             out.writeLong(ibis.registry().getSequenceNumber(name));
         }
     }
