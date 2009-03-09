@@ -89,8 +89,8 @@ class IbisMPIInterface {
 
     private HashMap<Integer, Integer> locks = new HashMap<Integer, Integer>();
 
-    private HashSet<Integer> done = new HashSet<Integer>();
-
+    private HashSet<Integer> signalled = new HashSet<Integer>();
+    
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
             String libPath = props.getProperty("ibis.mpi.libpath");
@@ -152,6 +152,7 @@ class IbisMPIInterface {
         for (Integer d : locks.keySet()) {
             synchronized(d) {
                 poller = d;
+                signalled.add(d);
                 d.notifyAll();
                 return;
             }
@@ -214,11 +215,11 @@ class IbisMPIInterface {
                         synchronized (this) {
                             Integer dd = new Integer(finishedId);
                             d = locks.get(dd);
-                        }
-                        if (d != null) {
-                            synchronized(d) {
-                                done.add(d);
-                                d.notifyAll();
+                            if (d != null) {
+                                synchronized(d) {
+                                    signalled.add(d);
+                                    d.notifyAll();
+                                }
                             }
                         }
                     } else {
@@ -229,16 +230,16 @@ class IbisMPIInterface {
             } else {
                 // I am not the poller
                 synchronized(myLock) {
-                    if (! done.contains(myLock)) {
+                    if (! signalled.contains(myLock)) {
                         try {
                             myLock.wait();
                         } catch (Exception e) {
                             // ignore
                         }
                     }
-                    done.remove(myLock);
                 }
                 synchronized(this) {
+                    signalled.remove(myLock);
                     locks.remove(myLock);
                     if (myLock.equals(poller)) {
                         continue;
