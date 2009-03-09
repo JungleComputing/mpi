@@ -11,15 +11,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
+
 class IbisMPIInterface {
+
+    private static final Logger logger
+            = Logger.getLogger("ibis.impl.mpi.IbisMPIInterface");
+
+    private static final boolean DEBUG = true;
 
     static final boolean SINGLE_THREAD = false;
 
     static final int MAX_POLLS = 100;
 
     static final boolean ONE_POLLER = true;
-
-    static final boolean DEBUG = false;
 
     static final int SINGLE_POLLER_NANO_SLEEP_TIME = -1; // don't sleep between polls
 
@@ -80,7 +85,7 @@ class IbisMPIInterface {
 
     private int rank;
 
-    private boolean pollToken = false;
+    private Integer poller = null;
 
     private HashMap<Integer, Integer> locks = new HashMap<Integer, Integer>();
 
@@ -133,27 +138,32 @@ class IbisMPIInterface {
         }
     }
 
-    private synchronized boolean getPollToken() {
-        if (!pollToken) {
-            pollToken = true;
+    private synchronized boolean getPollToken(Integer myLock) {
+        if (poller == null || myLock.equals(poller)) {
+            poller = myLock;
             return true;
         }
-
+        locks.put(myLock, myLock);
         return false;
     }
 
-    private synchronized void releasePollToken() {
-        pollToken = false;
+    private synchronized void releasePoller() {
+        poller = null;
+        for (Integer d : locks.keySet()) {
+            synchronized(d) {
+                poller = d;
+                d.notifyAll();
+                return;
+            }
+        }
     }
 
     int doSend(Object buf, int offset, int count, int type, int dest,
         int tag) {
-        if (DEBUG) {
-            System.err
-                .println(rank + " doing send, buflen = " + getBufLen(buf, type)
+        if (DEBUG && logger.isTraceEnabled()) {
+                logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
                     + " off = " + offset + " count = " + count + " type = "
-                    + type + " dest = " + dest + " tag = " + tag);
-            new Exception().printStackTrace();
+                    + type + " dest = " + dest + " tag = " + tag, new Exception());
         }
 
         if (SINGLE_THREAD) {
@@ -182,7 +192,7 @@ class IbisMPIInterface {
 
         Integer myLock = new Integer(id);
         while (true) {
-            boolean iAmPoller = getPollToken();
+            boolean iAmPoller = getPollToken(myLock);
             if (iAmPoller) {
                 int polls = MAX_POLLS;
                 while (polls >= 0) {
@@ -195,16 +205,7 @@ class IbisMPIInterface {
                             throw new Error(
                                 "internal error, testAll returned my id, but test failed");
                         }
-                        releasePollToken();
-
-                        synchronized(this) {
-                            for (Integer d : locks.keySet()) {
-                                synchronized(d) {
-                                    d.notifyAll();
-                                }
-                            }
-                        }
-
+                        releasePoller();
                         return 1;
                     } else if (finishedId >= 0) {
                         // some operation posted by another thread (not the poller)
@@ -227,9 +228,6 @@ class IbisMPIInterface {
                 nanosleep(SINGLE_POLLER_NANO_SLEEP_TIME);
             } else {
                 // I am not the poller
-                synchronized(this) {
-                    locks.put(myLock, myLock);
-                }
                 synchronized(myLock) {
                     if (! done.contains(myLock)) {
                         try {
@@ -242,6 +240,9 @@ class IbisMPIInterface {
                 }
                 synchronized(this) {
                     locks.remove(myLock);
+                    if (myLock.equals(poller)) {
+                        continue;
+                    }
                 }
                 
                 // poll once
@@ -255,12 +256,10 @@ class IbisMPIInterface {
 
     int doRecv(Object buf, int offset, int count, int type, int src,
         int tag) {
-        if (DEBUG) {
-            System.err
-                .println(rank + " doing recv, buflen = " + getBufLen(buf, type)
+        if (DEBUG && logger.isTraceEnabled()) {
+            logger.trace(rank + " doing recv, buflen = " + getBufLen(buf, type)
                     + " off = " + offset + " count = " + count + " type = "
-                    + type + " src = " + src + " tag = " + tag);
-            new Exception().printStackTrace();
+                    + type + " src = " + src + " tag = " + tag, new Exception());
         }
 
         if (SINGLE_THREAD) {
