@@ -460,7 +460,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
 
     if(res != MPI_SUCCESS) return -1;
 
-    return 1;
+    int count;
+    res = MPI_Get_count(&status, MPI_BYTE, &count);
+    return count;
 }
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
@@ -550,9 +552,12 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
 	    freeRcvBuffer(env, buf, offset, count, type, req->buffer);
 	}
 	deleteRequest(req);
+	int count;
+	res = MPI_Get_count(&status, MPI_BYTE, &count);
+	return count;
     }
 
-    return flag;
+    return -1;
 }
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAll

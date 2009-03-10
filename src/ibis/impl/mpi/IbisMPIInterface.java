@@ -176,13 +176,16 @@ class IbisMPIInterface {
         return waitOrPoll(id, buf, offset, count, type);
     }
 
+    /**
+     * Returns the number of bytes written/read.
+     */
     private int waitOrPoll(int id, Object buf, int offset, int count, int type) {
 
         if (!ONE_POLLER) {
             while (true) {
-                int flag = test(id, buf, offset, count, type);
-                if (flag != 0) {
-                    return 1;
+                int cnt = test(id, buf, offset, count, type);
+                if (cnt != -1) {
+                    return cnt;
                 }
 
                 nanosleep(NANO_SLEEP_TIME);
@@ -201,13 +204,13 @@ class IbisMPIInterface {
                     if (finishedId == id) {
                         // my operation is done!
                         // we have to do a test to release buffers
-                        int flag = test(id, buf, offset, count, type);
-                        if (flag == 0) {
+                        int cnt = test(id, buf, offset, count, type);
+                        if (cnt == -1) {
                             throw new Error(
                                 "internal error, testAll returned my id, but test failed");
                         }
                         releasePoller();
-                        return 1;
+                        return cnt;
                     } else if (finishedId >= 0) {
                         // some operation posted by another thread (not the poller)
                         // was done. Notify it.
@@ -247,9 +250,9 @@ class IbisMPIInterface {
                 }
                 
                 // poll once
-                int flag = test(id, buf, offset, count, type);
-                if (flag != 0) {
-                    return 1;
+                int cnt = test(id, buf, offset, count, type);
+                if (cnt != -1) {
+                    return cnt;
                 }
             }
         } // end of while
