@@ -244,14 +244,16 @@ class IbisMPIInterface {
                 synchronized(this) {
                     signalled.remove(myLock);
                     locks.remove(myLock);
-                    if (myLock.equals(poller)) {
-                        continue;
-                    }
                 }
                 
                 // poll once
                 int cnt = test(id, buf, offset, count, type);
                 if (cnt != -1) {
+                    synchronized(this) {
+                        if (myLock.equals(poller)) {
+                            releasePoller();
+                        }
+                    }
                     return cnt;
                 }
             }
