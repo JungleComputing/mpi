@@ -6,7 +6,7 @@
 #include <jni.h>
 #include <stdlib.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define TYPE_BOOLEAN 1
 #define TYPE_BYTE 2
@@ -460,8 +460,8 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
 
     if(res != MPI_SUCCESS) return -1;
 
-    int count;
-    res = MPI_Get_count(&status, MPI_BYTE, &count);
+    int bytecount;
+    res = MPI_Get_count(&status, MPI_BYTE, &bytecount);
     return count;
 }
 
@@ -522,8 +522,8 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
     res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &(req->request));
 
 #if DEBUG
-    fprintf(stderr, "%d: Irecv of %d bytes from %d, tag is %d, type is %d (%d bytes/elt) ID = %d DONE\n", 
-	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id);
+    fprintf(stderr, "%d: Irecv of %d bytes from %d, tag is %d, type is %d (%d bytes/elt) ID = %d DONE, SUCCESS = %d\n", 
+	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id, res == MPI_SUCCESS);
 #endif
 
     if(res != MPI_SUCCESS) return -1;
@@ -542,7 +542,7 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
     res = MPI_Test(&(req->request), &flag, &status);
 
 #if DEBUG
-    /*	fprintf(stderr, "%d: test for id %d, result = %d\n", ibisMPI_rank, id, flag);*/
+    fprintf(stderr, "%d: test for id %d, result = %d\n", ibisMPI_rank, id, flag);
 #endif
 
     if(flag) { /* send or receive is done */
@@ -568,6 +568,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAll
 
     struct ibisMPI_request* req = ibisMPI_requestList;
 
+    if (req == NULL) {
+	fprintf(stderr, "testAll called, but req list is empty\n");
+    }
     while(req != NULL) {
 	res = MPI_Test(&(req->request), &flag, &status);
 
