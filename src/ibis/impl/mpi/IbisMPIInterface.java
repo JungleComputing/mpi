@@ -11,12 +11,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class IbisMPIInterface {
 
     private static final Logger logger
-            = Logger.getLogger("ibis.impl.mpi.IbisMPIInterface");
+            = LoggerFactory.getLogger("ibis.impl.mpi.IbisMPIInterface");
 
     private static final boolean DEBUG = true;
 
@@ -351,7 +352,7 @@ class IbisMPIInterface {
         }
 
         time = System.currentTimeMillis() - start;
-        double usecs = ((double) time * 1000.0) / times;
+        double usecs = (time * 1000.0) / times;
 
         System.err.println(m.rank + ": latency = " + usecs + " usecs/message");
 
@@ -380,7 +381,7 @@ class IbisMPIInterface {
             }
 
             time = System.currentTimeMillis() - start;
-            double secs = (double) time / 1000.0;
+            double secs = time / 1000.0;
 
             double mbytes = (msg.length * times) / (1024.0 * 1024.0);
             double thrp = mbytes / secs;

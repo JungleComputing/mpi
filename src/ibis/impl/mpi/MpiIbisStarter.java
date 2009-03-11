@@ -10,12 +10,13 @@ import ibis.ipl.RegistryEventHandler;
 
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
 
     static final Logger logger
-            = Logger.getLogger(MpiIbisStarter.class);
+            = LoggerFactory.getLogger(MpiIbisStarter.class);
 
     static final IbisCapabilities ibisCapabilities = new IbisCapabilities(
             IbisCapabilities.CLOSED_WORLD,

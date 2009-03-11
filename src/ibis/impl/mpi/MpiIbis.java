@@ -35,13 +35,14 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class MpiIbis extends ibis.ipl.impl.Ibis
         implements Runnable, MpiProtocol {
 
     private static final Logger logger
-            = Logger.getLogger("ibis.impl.mpi.MpiIbis");
+            = LoggerFactory.getLogger("ibis.impl.mpi.MpiIbis");
 
     private IbisMPIInterface mpi;
 
@@ -70,7 +71,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     protected byte[] getData() throws IOException {
         InetAddress addr = IPUtils.getLocalHostAddress();
         if (addr == null) {
-            logger.fatal("ERROR: could not get my own IP address, exiting.");
+            logger.error("ERROR: could not get my own IP address, exiting.");
             System.exit(1);
         }
 
@@ -286,7 +287,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                 s = systemServer.accept();
             } catch (Throwable e) {
                 /* if the accept itself fails, we have a fatal problem. */
-                logger.fatal("MpiIbis:run: got fatal exception in accept! ", e);
+                logger.error("MpiIbis:run: got fatal exception in accept! ", e);
                 cleanup();
                 throw new Error("Fatal: MpiIbis could not do an accept", e);
             }
