@@ -6,7 +6,7 @@
 #include <jni.h>
 #include <stdlib.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define TYPE_BOOLEAN 1
 #define TYPE_BYTE 2
@@ -29,8 +29,10 @@ static int noncopying = 1;
 struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
+    int tested; /* 1 means: already tested OK. */
     MPI_Request request;
     void* buffer;
+    int size;
     struct ibisMPI_request* next;
 };
 
@@ -143,6 +145,8 @@ static struct ibisMPI_request* allocRequest(void* buffer) {
     res->id = ibisMPI_currentId++;
     res->buffer = buffer;
     res->next = ibisMPI_requestList;
+    res->size = 0;
+    res->tested = 0;
     ibisMPI_requestList = res;
 
     return res;
@@ -456,13 +460,15 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
     fprintf(stderr, "%d: recv of %d bytes from %d, tag is %d DONE\n", ibisMPI_rank, size, src, tag);
 #endif
 
+    int bytecount;
+
+    res = MPI_Get_count(&status, MPI_BYTE, &bytecount);
+
     freeRcvBuffer(env, buf, offset, count, type, bufptr);
 
     if(res != MPI_SUCCESS) return -1;
 
-    int bytecount;
-    res = MPI_Get_count(&status, MPI_BYTE, &bytecount);
-    return count;
+    return bytecount;
 }
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
@@ -519,6 +525,7 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
+    ((char *)bufptr->buf)[0] = 33;
     res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &(req->request));
 
 #if DEBUG
@@ -539,22 +546,33 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
     MPI_Status status;
     struct ibisMPI_request* req = findRequest(id);
 
-    res = MPI_Test(&(req->request), &flag, &status);
-
+    if (! req->tested) {
+	res = MPI_Test(&(req->request), &flag, &status);
 #if DEBUG
-    fprintf(stderr, "%d: test for id %d, result = %d\n", ibisMPI_rank, id, flag);
+	fprintf(stderr, "%d: test for id %d, flag = %d\n", ibisMPI_rank, id, flag);
+	if (flag) { /* send or receive is done */
+	    req->tested = 1;
+	    if (! req->isSend) {
+		MPI_Get_count(&status, MPI_BYTE, &(req->size));
+	    }
+	}
 #endif
+    } else {
+	flag = 1;
+    }
 
     if(flag) { /* send or receive is done */
+	int size = req->size;
 	if (req->isSend) {
 	    freeSendBuffer(env, buf, type, req->buffer);
 	} else {
+#if DEBUG
+	    fprintf(stderr, "%d: get_count for id %d, result = %d\n", ibisMPI_rank, id, size);
+#endif
 	    freeRcvBuffer(env, buf, offset, count, type, req->buffer);
 	}
 	deleteRequest(req);
-	int count;
-	res = MPI_Get_count(&status, MPI_BYTE, &count);
-	return count;
+	return size;
     }
 
     return -1;
@@ -572,14 +590,17 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAll
 	fprintf(stderr, "testAll called, but req list is empty\n");
     }
     while(req != NULL) {
-	res = MPI_Test(&(req->request), &flag, &status);
-
-	if(flag) { /* send or receive is done */
-	    return req->id;
+	if (! req->tested) {
+	    res = MPI_Test(&(req->request), &flag, &status);
+	    if (flag) { /* send or receive is done */
+		req->tested = 1;
+		if (! req->isSend) {
+		    MPI_Get_count(&status, MPI_BYTE, &(req->size));
+		}
+		return req->id;
+	    }
 	}
-
 	req = req->next;
     }
-
     return -1; 
 }

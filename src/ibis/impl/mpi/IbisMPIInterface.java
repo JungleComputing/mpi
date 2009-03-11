@@ -203,12 +203,7 @@ class IbisMPIInterface {
                     int finishedId = testAll();
                     if (finishedId == id) {
                         // my operation is done!
-                        // we have to do a test to release buffers
                         int cnt = test(id, buf, offset, count, type);
-                        if (cnt == -1) {
-                            throw new Error(
-                                "internal error, testAll returned my id, but test failed");
-                        }
                         releasePoller();
                         return cnt;
                     } else if (finishedId >= 0) {
