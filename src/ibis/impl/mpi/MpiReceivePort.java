@@ -36,7 +36,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         public void run() {
             logger.debug("Started connection handler thread");
             try {
-                reader();
+                reader(false);
             } catch (Throwable e) {
                 logger.debug("ConnectionHandler.run, connected "
                         + "to " + origin + ", caught exception", e);
@@ -49,7 +49,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
             ThreadPool.createNew(this, "ConnectionHandler");
         }
 
-        void reader() throws IOException {
+        void reader(boolean noThread) throws IOException {
             byte opcode = -1;
 
             if (in == null) {
@@ -81,7 +81,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                     messageArrived(m);
                     // Note: if upcall calls finish, a new message is
                     // allocated, so we cannot look at "message" anymore.
-                    if (m.finishCalledInUpcall()) {
+                    if (noThread || m.finishCalledInUpcall()) {
                         return;
                     }
                     break;
@@ -123,14 +123,23 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         }
     }
 
+    private final boolean no_connectionhandler_thread;
+
+    private boolean reader_busy = false;
+
     MpiReceivePort(Ibis ibis, PortType type, String name, MessageUpcall upcall,
             ReceivePortConnectUpcall connUpcall, Properties props) throws IOException {
         super(ibis, type, name, upcall, connUpcall, props);
+
+        no_connectionhandler_thread = upcall == null && connUpcall == null
+                && type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                && !type.hasCapability(PortType.RECEIVE_POLL)
+                && !type.hasCapability(PortType.RECEIVE_TIMEOUT);
     }
 
     public void messageArrived(ReadMessage msg) {
         super.messageArrived(msg);
-        if (upcall == null) {
+        if (! no_connectionhandler_thread && upcall == null) {
             synchronized(this) {
                 // Wait until the message is finished before starting to
                 // read from the stream again ...
@@ -145,11 +154,82 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         }
     }
 
+    public ReadMessage getMessage(long timeout) throws IOException {
+        if (no_connectionhandler_thread) {
+            // Allow only one reader in.
+            synchronized(this) {
+                while (reader_busy && ! closed) {
+                    try {
+                        wait();
+                    } catch(Exception e) {
+                        // ignored
+                    }
+                }
+                if (closed) {
+                    throw new IOException("receive() on closed port");
+                }
+                reader_busy = true;
+            }
+            // Since we don't have any threads or timeout here, this 'reader' 
+            // call directly handles the receive.              
+            for (;;) {
+                // Wait until there is a connection            
+                synchronized(this) {
+                    while (connections.size() == 0 && ! closed) {
+                        try {
+                            wait();
+                        } catch (Exception e) {
+                            /* ignore */
+                        }
+                    }
+
+                    // Wait until the current message is done
+                    while (message != null && ! closed) {
+                        try {
+                            wait();
+                        } catch (Exception e) {
+                            /* ignore */
+                        }
+                    }
+                    if (closed) {
+                        reader_busy = false;
+                        notifyAll();
+                        throw new IOException("receive() on closed port");
+                    }
+                }
+
+                ReceivePortConnectionInfo conns[] = connections();
+                // Note: This call does NOT always result in a message!
+                ((ConnectionHandler)conns[0]).reader(true);
+                synchronized(this) {
+                    if (message != null) {
+                        reader_busy = false;
+                        notifyAll();
+                        return message;
+                    }
+                }
+            }
+        } else {
+            return super.getMessage(timeout);
+        }
+    }
+
+    public synchronized void closePort(long timeout) {
+        ReceivePortConnectionInfo conns[] = connections();
+        if (no_connectionhandler_thread && conns.length > 0) {
+            ThreadPool.createNew((ConnectionHandler) conns[0],
+                    "ConnectionHandler");
+        }
+        super.closePort(timeout);
+    }
+
+
     synchronized void connect(SendPortIdentifier origin, int tag, int rank)
             throws IOException {
         DataInputStream in = new MpiDataInputStream(rank, tag);
         ConnectionHandler conn = new ConnectionHandler(origin, this, in);
-
-        ThreadPool.createNew(conn, "ConnectionHandler");
+        if (! no_connectionhandler_thread) {
+            ThreadPool.createNew(conn, "ConnectionHandler");
+        }
     }
 }
