@@ -19,17 +19,13 @@ class IbisMPIInterface {
     private static final Logger logger
             = LoggerFactory.getLogger("ibis.impl.mpi.IbisMPIInterface");
 
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     static final boolean SINGLE_THREAD = false;
 
-    static final int MAX_POLLS = 100;
+    static final int MAX_POLLS = 10000;
 
-    static final boolean ONE_POLLER = true;
-
-    static final int SINGLE_POLLER_NANO_SLEEP_TIME = -1; // don't sleep between polls
-
-    static final int NANO_SLEEP_TIME = -1; // don't sleep between polls
+    static final int NANO_SLEEP_TIME = 0; // don't sleep between polls
 
     // static final int NANO_SLEEP_TIME = 10 * 1000; // 10 us
 
@@ -74,11 +70,7 @@ class IbisMPIInterface {
     synchronized native int test(int id, Object buf, int offset,
         int count, int type);
 
-    /** 
-     * 
-     * @return returns id of a send/recv that is done, or -1 if no operation is finished
-     */
-    public synchronized native int testAll();
+    synchronized native int testAny(int id);
 
     private static IbisMPIInterface instance;
 
@@ -144,18 +136,22 @@ class IbisMPIInterface {
             poller = myLock;
             return true;
         }
-        locks.put(myLock, myLock);
         return false;
     }
 
-    private synchronized void releasePoller() {
+    private synchronized void releasePoller(Integer myLock, boolean remove) {
         poller = null;
+        if (remove) {
+            locks.remove(myLock);
+        }
         for (Integer d : locks.keySet()) {
-            synchronized(d) {
-                poller = d;
-                signalled.add(d);
-                d.notifyAll();
-                return;
+            if (! d.equals(myLock)) {
+                synchronized(d) {
+                    poller = d;
+                    signalled.add(d);
+                    d.notifyAll();
+                    return;
+                }
             }
         }
     }
@@ -165,7 +161,7 @@ class IbisMPIInterface {
         if (DEBUG && logger.isTraceEnabled()) {
                 logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
                     + " off = " + offset + " count = " + count + " type = "
-                    + type + " dest = " + dest + " tag = " + tag, new Exception());
+                    + type + " dest = " + dest + " tag = " + tag);
         }
 
         if (SINGLE_THREAD) {
@@ -173,39 +169,31 @@ class IbisMPIInterface {
         }
 
         // use asynchronous sends
-        int id = isend(buf, offset, count, type, dest, tag);
-        return waitOrPoll(id, buf, offset, count, type);
+        Integer myLock;
+        synchronized(this) {
+            int id = isend(buf, offset, count, type, dest, tag);
+            myLock = new Integer(id);
+            locks.put(myLock, myLock);
+        }
+        return waitOrPoll(myLock, buf, offset, count, type);
     }
 
     /**
      * Returns the number of bytes written/read.
      */
-    private int waitOrPoll(int id, Object buf, int offset, int count, int type) {
+    private int waitOrPoll(Integer myLock, Object buf, int offset, int count, int type) {
 
-        if (!ONE_POLLER) {
-            while (true) {
-                int cnt = test(id, buf, offset, count, type);
-                if (cnt != -1) {
-                    return cnt;
-                }
-
-                nanosleep(NANO_SLEEP_TIME);
-            }
-        }
-
-        // there is only one poller thread
-
-        Integer myLock = new Integer(id);
+        int id = myLock.intValue();
         while (true) {
             boolean iAmPoller = getPollToken(myLock);
             if (iAmPoller) {
                 int polls = MAX_POLLS;
-                while (polls >= 0) {
-                    int finishedId = testAll();
+                while (--polls >= 0) {
+                    int finishedId = testAny(id);
                     if (finishedId == id) {
                         // my operation is done!
                         int cnt = test(id, buf, offset, count, type);
-                        releasePoller();
+                        releasePoller(myLock, true);
                         return cnt;
                     } else if (finishedId >= 0) {
                         // some operation posted by another thread (not the poller)
@@ -225,7 +213,7 @@ class IbisMPIInterface {
                         // nothing finished
                     }
                 }
-                nanosleep(SINGLE_POLLER_NANO_SLEEP_TIME);
+                nanosleep(NANO_SLEEP_TIME);
             } else {
                 // I am not the poller
                 synchronized(myLock) {
@@ -247,8 +235,9 @@ class IbisMPIInterface {
                 if (cnt != -1) {
                     synchronized(this) {
                         if (myLock.equals(poller)) {
-                            releasePoller();
+                            releasePoller(poller, false);
                         }
+                        locks.remove(myLock);
                     }
                     return cnt;
                 }
@@ -261,7 +250,7 @@ class IbisMPIInterface {
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " doing recv, buflen = " + getBufLen(buf, type)
                     + " off = " + offset + " count = " + count + " type = "
-                    + type + " src = " + src + " tag = " + tag, new Exception());
+                    + type + " src = " + src + " tag = " + tag);
         }
 
         if (SINGLE_THREAD) {
@@ -269,8 +258,13 @@ class IbisMPIInterface {
         }
 
         // use asynchronous recv
-        int id = irecv(buf, offset, count, type, src, tag);
-        return waitOrPoll(id, buf, offset, count, type);
+        Integer myLock;
+        synchronized(this) {
+            int id = irecv(buf, offset, count, type, src, tag);
+            myLock = new Integer(id);
+            locks.put(myLock, myLock);
+        }
+        return waitOrPoll(myLock, buf, offset, count, type);
     }
 
     private int getBufLen(Object buf, int type) {

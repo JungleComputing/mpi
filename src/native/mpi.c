@@ -30,10 +30,8 @@ struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
     int tested; /* 1 means: already tested OK. */
-    MPI_Request request;
     void* buffer;
     int size;
-    struct ibisMPI_request* next;
 };
 
 struct ibisMPI_buf {
@@ -44,8 +42,11 @@ struct ibisMPI_buf {
 
 static struct ibisMPI_buf *ibisMPI_bufcache;
 
-struct ibisMPI_request* ibisMPI_requestList = NULL;
-struct ibisMPI_request* ibisMPI_requestCache = NULL;
+struct ibisMPI_request* ibisMPI_requestInfoArray;
+static MPI_Request *ibisMPI_requestArray;
+static int ibisMPI_requestArraySize;
+static int ibisMPI_requestsUsed;
+
 
 /*
  * Class:     ibis_mpi_IbisMPI
@@ -79,8 +80,20 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
     ibisMPI_typeSize[TYPE_LONG] = 8;
     ibisMPI_typeSize[TYPE_DOUBLE] = 8;
 
-    ibisMPI_requestList = NULL;
     ibisMPI_currentId = 0;
+
+    ibisMPI_requestArraySize = 32;
+    ibisMPI_requestArray = (MPI_Request *)
+	malloc(ibisMPI_requestArraySize * sizeof(MPI_Request));
+    ibisMPI_requestInfoArray = (struct ibisMPI_request *)
+	malloc(ibisMPI_requestArraySize * sizeof(struct ibisMPI_request));
+    if (ibisMPI_requestArray == NULL || ibisMPI_requestInfoArray == NULL) {
+#if DEBUG       
+        fprintf(stderr, "%d: MPI init: malloc failed\n", ibisMPI_rank);
+#endif
+        return -1;
+    }
+    ibisMPI_requestsUsed = 0;
 
 #if DEBUG	
     fprintf(stderr, "%d: MPI init done\n", ibisMPI_rank);
@@ -121,44 +134,53 @@ static void releaseBuf(struct ibisMPI_buf *p) {
     ibisMPI_bufcache = p;
 }
 
-static struct ibisMPI_request* getCachedRequest() {
-    if(ibisMPI_requestCache == NULL) {
-	return (struct ibisMPI_request*) malloc(sizeof(struct ibisMPI_request));
+static struct ibisMPI_request *getCachedRequest() {
+    if (ibisMPI_requestsUsed >= ibisMPI_requestArraySize) {
+	ibisMPI_requestArraySize += ibisMPI_requestArraySize;
+	ibisMPI_requestArray = (MPI_Request *)
+	    realloc(ibisMPI_requestArray,
+		    ibisMPI_requestArraySize * sizeof(MPI_Request));
+	ibisMPI_requestInfoArray = (struct ibisMPI_request *)
+	    realloc(ibisMPI_requestInfoArray,
+		    ibisMPI_requestArraySize * sizeof(struct ibisMPI_request));
+	if (ibisMPI_requestArray == NULL || ibisMPI_requestInfoArray == NULL) {
+	    return NULL;
+	}
     }
-
-    struct ibisMPI_request* res = ibisMPI_requestCache;
-    ibisMPI_requestCache = res->next;
-
-    return res;
+    return &ibisMPI_requestInfoArray[ibisMPI_requestsUsed++];
 }
 
-static void freeCachedRequest(struct ibisMPI_request* toDelete) {
-    toDelete->next = ibisMPI_requestCache;
-    ibisMPI_requestCache = toDelete;
+static void freeCachedRequest(int index) {
+    ibisMPI_requestsUsed--;
+    if (index < ibisMPI_requestsUsed) {
+	ibisMPI_requestArray[index] = ibisMPI_requestArray[ibisMPI_requestsUsed];
+	ibisMPI_requestInfoArray[index] = ibisMPI_requestInfoArray[ibisMPI_requestsUsed];
+    }
 }
 
 
 static struct ibisMPI_request* allocRequest(void* buffer) {
     struct ibisMPI_request* res = getCachedRequest();
-    if(res == NULL) return NULL;
+    if (res == NULL) {
+	return NULL;
+    }
 
     res->id = ibisMPI_currentId++;
     res->buffer = buffer;
-    res->next = ibisMPI_requestList;
     res->size = 0;
     res->tested = 0;
-    ibisMPI_requestList = res;
-
     return res;
 }
 
 static struct ibisMPI_request* findRequest(int id) {
-    struct ibisMPI_request* res = ibisMPI_requestList;
-    while(res != NULL) {
-	if(res->id == id) {
+    int i;
+    struct ibisMPI_request* res;
+
+    for (i = 0, res = &ibisMPI_requestInfoArray[0];
+	    i < ibisMPI_requestsUsed; i++, res++) {
+	if (res->id == id) {
 	    return res;
 	}
-	res = res->next;
     }
 
     fprintf(stderr, "request not found!\n");
@@ -166,28 +188,8 @@ static struct ibisMPI_request* findRequest(int id) {
 }
 
 static void deleteRequest(struct ibisMPI_request* toDelete) {
-    struct ibisMPI_request* prev = NULL;
-    struct ibisMPI_request* res = ibisMPI_requestList;
-
-    while(res != toDelete) {
-	prev = res;
-	res = res->next;
-	if(res == NULL) {
-	    fprintf(stderr, "delete of unknow request!\n");
-	    return;
-	}
-    }
-
-    if(prev == NULL) { /* delete of head */
-	ibisMPI_requestList = res->next;
-	return;
-    }
-
-    prev->next = res->next;
-
-    freeCachedRequest(toDelete);
+    freeCachedRequest(toDelete - &ibisMPI_requestInfoArray[0]);
 }
-
 
 JNIEXPORT void JNICALL Java_ibis_impl_mpi_IbisMPIInterface_end
 (JNIEnv *env, jobject jthis) {
@@ -481,15 +483,17 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
     struct ibisMPI_request* req = allocRequest(bufptr);
     req->isSend = 1;
 
+    int index = req - &ibisMPI_requestInfoArray[0];
+
 #if DEBUG
     fprintf(stderr, "%d: Isend of %d bytes to %d, tag is %d, type is %d (%d bytes/elt) ID = %d\n", 
 	    ibisMPI_rank, size, dest, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
     if (noncopying) {
-	res = MPI_Isend(bufptr + offset*ibisMPI_typeSize[type], size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &(req->request));
+	res = MPI_Isend(bufptr + offset*ibisMPI_typeSize[type], size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
     } else {
-	res = MPI_Isend(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &(req->request));
+	res = MPI_Isend(bufptr, size, MPI_BYTE, dest, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
     }
 
 #if DEBUG
@@ -516,13 +520,15 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
     struct ibisMPI_request* req = allocRequest(bufptr);
     req->isSend = 0;
 
+    int index = req - &ibisMPI_requestInfoArray[0];
+
 #if DEBUG
     fprintf(stderr, "%d: Irecv of %d bytes from %d, tag is %d, type is %d (%d bytes/elt) ID = %d\n", 
 	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
     ((char *)bufptr->buf)[0] = 33;
-    res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &(req->request));
+    res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
 
 #if DEBUG
     fprintf(stderr, "%d: Irecv of %d bytes from %d, tag is %d, type is %d (%d bytes/elt) ID = %d DONE, SUCCESS = %d\n", 
@@ -543,16 +549,20 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
     struct ibisMPI_request* req = findRequest(id);
 
     if (! req->tested) {
-	res = MPI_Test(&(req->request), &flag, &status);
+	int index = req - &ibisMPI_requestInfoArray[0];
+	res = MPI_Test(&ibisMPI_requestArray[index], &flag, &status);
 #if DEBUG
 	fprintf(stderr, "%d: test for id %d, flag = %d\n", ibisMPI_rank, id, flag);
+#endif
 	if (flag) { /* send or receive is done */
 	    req->tested = 1;
 	    if (! req->isSend) {
 		MPI_Get_count(&status, MPI_BYTE, &(req->size));
+#if DEBUG
+		fprintf(stderr, "%d: in test, get_count for id %d, result = %d\n", ibisMPI_rank, id, req->size);
+#endif
 	    }
 	}
-#endif
     } else {
 	flag = 1;
     }
@@ -562,9 +572,6 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
 	if (req->isSend) {
 	    freeSendBuffer(env, buf, type, req->buffer);
 	} else {
-#if DEBUG
-	    fprintf(stderr, "%d: get_count for id %d, result = %d\n", ibisMPI_rank, id, size);
-#endif
 	    freeRcvBuffer(env, buf, offset, count, type, req->buffer);
 	}
 	deleteRequest(req);
@@ -574,29 +581,38 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_test
     return -1;
 }
 
-JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAll
-(JNIEnv *env, jobject jthis) {
+JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAny
+(JNIEnv *env, jobject jthis, jint id) {
     int res;
     int flag;
+    int index = -1;
     MPI_Status status;
 
-    struct ibisMPI_request* req = ibisMPI_requestList;
+    /* First test my own id. */
+    struct ibisMPI_request* req = findRequest(id);
+    if (req->tested) {
+	return id;
+    }
 
-    if (req == NULL) {
-	fprintf(stderr, "testAll called, but req list is empty\n");
+    res = MPI_Testany(ibisMPI_requestsUsed, ibisMPI_requestArray,
+	    &index, &flag, &status);
+
+    if (index < 0) {
+	return -1;
     }
-    while(req != NULL) {
-	if (! req->tested) {
-	    res = MPI_Test(&(req->request), &flag, &status);
-	    if (flag) { /* send or receive is done */
-		req->tested = 1;
-		if (! req->isSend) {
-		    MPI_Get_count(&status, MPI_BYTE, &(req->size));
-		}
-		return req->id;
-	    }
-	}
-	req = req->next;
+
+    req = &ibisMPI_requestInfoArray[index];
+
+    if (! req->isSend) {
+	MPI_Get_count(&status, MPI_BYTE, &(req->size));
+#if DEBUG
+	fprintf(stderr, "%d: in testAny, get_count for id %d, result = %d\n", ibisMPI_rank, req->id, req->size);
+#endif
+    } else {
+#if DEBUG
+	fprintf(stderr, "%d: in testAny, send id %d\n", ibisMPI_rank, req->id);
+#endif
     }
-    return -1; 
+    req->tested = 1;
+    return req->id;
 }
