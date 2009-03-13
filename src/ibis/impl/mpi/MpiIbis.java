@@ -215,6 +215,15 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
             quiting = true;
             // Connect so that the MpiIbis thread wakes up.
             createClientSocket(local, myAddress, 0);
+            synchronized(this) {
+                while (quiting) {
+                    try {
+                        wait();
+                    } catch(Throwable e) {
+                        // ignored
+                    }
+                }
+            }
         } catch (Throwable e) {
             // Ignore
         }
@@ -301,6 +310,11 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                         logger.debug("--> it is a quit: RETURN");
                     }
                     cleanup();
+                    mpi.doEnd();
+                    synchronized(this) {
+                        quiting = false;
+                        notifyAll();
+                    }
                     return;
                 }
                 handleConnectionRequest(s);

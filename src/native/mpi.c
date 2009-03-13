@@ -196,16 +196,12 @@ JNIEXPORT void JNICALL Java_ibis_impl_mpi_IbisMPIInterface_end
     fprintf(stderr, "%d: MPI end\n", ibisMPI_rank);
 #endif
 
-    /* just do a barrier for now. MPI is closed world anyway. */
-    MPI_Barrier(MPI_COMM_WORLD);
+    /* Note:  MPI_Finalize() does not cause an exit() */ 
+    MPI_Finalize();
 
 #if DEBUG	
     fprintf(stderr, "%d: MPI end done\n", ibisMPI_rank);
 #endif
-
-    /* Cannot use this, this does an exit.
-       MPI_Finalize();
-       */
 }
 
 /*
