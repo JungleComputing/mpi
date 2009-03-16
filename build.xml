@@ -46,9 +46,10 @@
 	<!-- Put everything in ${tmp} into the jar file -->
 	<jar jarfile="${jar}" basedir="${tmp}">
 	    <manifest>
-		<attribute name="Ibis-Starter" value="ibis.impl.mpi.MpiIbisStarter"/>
-		<attribute name="Ibis-IPL-Version" value="2.0"/>
-		<attribute name="Ibis-Implementation-Version" value="${TIMESTAMP}" />
+		<attribute name="Ibis-Starter-Class" value="ibis.impl.mpi.MpiIbisStarter"/>
+		<attribute name="Ibis-IPL-Version" value="2.2"/>
+		<attribute name="Ibis-NickName" value="mpi"/>
+		<attribute name="Ibis-Implementation-Version" value="AAA" />
 	    </manifest>
 	</jar>
 

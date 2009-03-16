@@ -31,4 +31,4 @@ add_to_ipl_classpath $IPL_HOME/lib
 exec java \
     -classpath "$CLASSPATH:$IPL_CLASSPATH" \
     -Dlog4j.configuration=file:$IPL_HOME/log4j.properties \
-    "$@"
+    "$@" > out.`hostname` 2>&1
