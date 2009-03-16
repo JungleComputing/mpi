@@ -40,6 +40,9 @@ import org.slf4j.LoggerFactory;
 
 public final class MpiIbis extends ibis.ipl.impl.Ibis
         implements Runnable, MpiProtocol {
+    
+    private static final int CONNECT = 1;
+    private static final int DISCONNECT = 2;
 
     private static final Logger logger
             = LoggerFactory.getLogger("ibis.impl.mpi.MpiIbis");
@@ -122,6 +125,49 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         }
         return idAddr;
     }
+    
+    void sendDisconnect(ibis.ipl.impl.ReceivePortIdentifier rip) {
+        IbisIdentifier id = (IbisIdentifier) rip.ibisIdentifier();
+        String name = rip.name();
+        
+        InetSocketAddress idAddr = addresses[map.get(id)];
+        int port = idAddr.getPort();
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("--> Creating socket for connection to " + name
+                    + " at " + id + ", port = " + port);
+        }
+
+        DataOutputStream out = null;
+        Socket s = null;
+ 
+        try {
+            s = createClientSocket(local, idAddr, 1000);
+            out = new DataOutputStream(new BufferedArrayOutputStream(
+                    s.getOutputStream(), 4096));
+            out.writeInt(DISCONNECT);
+            out.writeUTF(name);
+            out.flush();
+            s.getInputStream().read();
+        } catch(IOException e) {
+            logger.info("Could not send disconnect message", e);
+        } finally {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+            } catch(Throwable e) {
+                // ignored
+            }
+            try {
+                if (s != null) {
+                    s.close();
+                }
+            } catch(Throwable e) {
+                // ignored
+            }
+        }
+    }
 
     int connect(MpiSendPort sp, ibis.ipl.impl.ReceivePortIdentifier rip,
             int timeout, int tag) throws IOException {
@@ -147,7 +193,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                 s = createClientSocket(local, idAddr, timeout);
                 out = new DataOutputStream(new BufferedArrayOutputStream(
                             s.getOutputStream(), 4096));
-
+                out.writeInt(CONNECT);
                 out.writeUTF(name);
                 sp.getIdent().writeTo(out);
                 sp.getPortType().writeTo(out);
@@ -229,9 +275,9 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
         }
     }
 
-    private void handleConnectionRequest(Socket s) throws IOException {
+    private void handleRequest(Socket s) throws IOException {
         if (logger.isDebugEnabled()) {
-            logger.debug("--> MpiIbis got connection request from "
+            logger.debug("--> MpiIbis got request from "
                     + s.getInetAddress() + ":" + s.getPort() + " on local port "
                     + s.getLocalPort());
         }
@@ -241,19 +287,32 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
 
         DataInputStream in = new DataInputStream(bais);
         OutputStream out = s.getOutputStream();
-
+        
+        int request = in.readInt();
         String name = in.readUTF();
-        SendPortIdentifier send = new SendPortIdentifier(in);
-        PortType sp = new PortType(in);
-        int tag = in.readInt();
 
         // First, lookup receiveport.
         MpiReceivePort rp = (MpiReceivePort) findReceivePort(name);
+
+        if (request == DISCONNECT) {
+            if (rp != null) {
+                rp.addDisconnect();
+            }
+            out.write(1);
+            out.close();
+            in.close();
+            return;
+        }
+
+        SendPortIdentifier send = new SendPortIdentifier(in);
+        PortType sp = new PortType(in);
+        int tag = in.readInt();
 
         int result;
         if (rp == null) {
             result = ReceivePort.NOT_PRESENT;
         } else {
+            rp.waitForDisconnects();
             result = rp.connectionAllowed(send, sp);
         }
 
@@ -317,7 +376,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
                     }
                     return;
                 }
-                handleConnectionRequest(s);
+                handleRequest(s);
             } catch (Throwable e) {
                 logger.error("EEK: MpiIbis:run: got exception "
                         + "(closing this socket only: ", e);

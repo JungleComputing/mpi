@@ -77,6 +77,7 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
     protected void sendDisconnectMessage(ReceivePortIdentifier receiver,
             SendPortConnectionInfo conn) throws IOException {
 
+        ((MpiIbis)ibis).sendDisconnect(receiver);
         out.writeByte(CLOSE_ONE_CONNECTION);
 
         byte[] receiverBytes = receiver.toBytes();

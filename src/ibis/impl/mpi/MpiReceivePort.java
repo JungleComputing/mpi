@@ -16,6 +16,7 @@ import ibis.io.Conversion;
 import ibis.io.DataInputStream;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Properties;
 
 class MpiReceivePort extends ReceivePort implements MpiProtocol {
@@ -113,6 +114,10 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                             logger.debug(name + ": disconnect from " + origin);
                         }
                         close(null);
+                        synchronized(port) {
+                            processedDisconnects++;
+                            port.notifyAll();
+                        }
                     }
                     break;
                 default:
@@ -127,6 +132,12 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
 
     private boolean reader_busy = false;
 
+    private Socket s = null;
+
+    private int numDisconnects = 0;
+  
+    private int processedDisconnects = 0;
+
     MpiReceivePort(Ibis ibis, PortType type, String name, MessageUpcall upcall,
             ReceivePortConnectUpcall connUpcall, Properties props) throws IOException {
         super(ibis, type, name, upcall, connUpcall, props);
@@ -137,6 +148,20 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                 && !type.hasCapability(PortType.RECEIVE_TIMEOUT);
     }
 
+    synchronized void waitForDisconnects() {
+        while (numDisconnects > processedDisconnects) {
+            try {
+                wait();
+            } catch(Throwable e) {
+                // ignored
+            }
+        }
+    }
+    
+    synchronized void addDisconnect() {
+        numDisconnects++;
+    }
+ 
     public void messageArrived(ReadMessage msg) {
         super.messageArrived(msg);
         if (! no_connectionhandler_thread && upcall == null) {
