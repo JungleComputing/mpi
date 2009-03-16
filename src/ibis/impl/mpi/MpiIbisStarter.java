@@ -5,9 +5,12 @@ package ibis.impl.mpi;
 import ibis.ipl.CapabilitySet;
 import ibis.ipl.Ibis;
 import ibis.ipl.IbisCapabilities;
+import ibis.ipl.IbisFactory;
 import ibis.ipl.PortType;
 import ibis.ipl.RegistryEventHandler;
+import ibis.ipl.registry.Credentials;
 
+import java.util.ArrayList;
 import java.util.Properties;
 
 import org.slf4j.Logger;
@@ -46,51 +49,48 @@ public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
             PortType.RECEIVE_TIMEOUT
         );
 
-    private boolean matching;
-    private int unmatchedPortTypes;
-
-    public MpiIbisStarter(IbisCapabilities caps, PortType[] types,
-            IbisStarterInfo info) {
-        super(caps, types, info);
-        boolean m = true;
-        if (! capabilities.matchCapabilities(ibisCapabilities)) {
-            m = false;
-        }
-        for (PortType pt : portTypes) {
-            if (! pt.matchCapabilities(portCapabilities)) {
-                unmatchedPortTypes++;
-                m = false;
-            }
-        }
-        matching = m;
+    public MpiIbisStarter(String nickName, String iplVersion,
+            String implementationVersion) {
+        super(nickName, iplVersion, implementationVersion);
     }
     
-    public boolean matches() { 
-        return matching;
-    }
-
-    public boolean isSelectable() {
+    public boolean matches(IbisCapabilities capabilities, PortType[] types) {
+        if (!capabilities.matchCapabilities(ibisCapabilities)) {
+            return false;
+        }
+        for (PortType portType : types) {
+            if (!portType.matchCapabilities(portCapabilities)) {
+                return false;
+            }
+        }
         return true;
     }
-
-    public CapabilitySet unmatchedIbisCapabilities() {
+    
+    public CapabilitySet unmatchedIbisCapabilities(
+            IbisCapabilities capabilities, PortType[] types) {
         return capabilities.unmatchedCapabilities(ibisCapabilities);
     }
 
-    public PortType[] unmatchedPortTypes() {
-        PortType[] unmatched = new PortType[unmatchedPortTypes];
-        int i = 0;
-        for (PortType pt : portTypes) {
-            if (! pt.matchCapabilities(portCapabilities)) {
-                unmatched[i++] = pt;
+    public PortType[] unmatchedPortTypes(IbisCapabilities capabilities,
+            PortType[] types) {
+        ArrayList<PortType> result = new ArrayList<PortType>();
+
+        for (PortType portType : types) {
+            if (!portType.matchCapabilities(portCapabilities)) {
+                result.add(portType);
             }
         }
-        return unmatched;
+        return result.toArray(new PortType[0]);
     }
-
-    public Ibis startIbis(RegistryEventHandler registryEventHandler,
-            Properties userProperties, String version) {
-        return new MpiIbis(registryEventHandler, capabilities, portTypes,
-                userProperties, version);
+    
+    public Ibis startIbis(IbisFactory factory,
+            RegistryEventHandler registryEventHandler, Properties userProperties,
+            IbisCapabilities capabilities, Credentials credentials, PortType[] portTypes, String specifiedSubImplementation) {
+        return new MpiIbis(registryEventHandler, capabilities, credentials,
+                portTypes, userProperties, this);
+    }
+    
+    public boolean isSelectable() {
+        return true;
     }
 }
