@@ -39,17 +39,28 @@
 	</javah>
     </target>
 
+
     <target name="build" depends="compile" description="build the JAR file">
+
+	<property name="mpi.files"
+	      value="ibis/impl/mpi/**/*.class"
+	/>
+
+	<checksum totalproperty="mpi.checksum">
+	    <fileset dir="${tmp}" includes="${mpi.files}" />
+	</checksum>
+
 	<!-- Create the distribution directory -->
 	<mkdir dir="${lib}" />
 
 	<!-- Put everything in ${tmp} into the jar file -->
-	<jar jarfile="${jar}" basedir="${tmp}">
+	<jar destfile="${jar}">
+	    <fileset dir="${tmp}" includes="${mpi.files}" />
 	    <manifest>
 		<attribute name="Ibis-Starter-Class" value="ibis.impl.mpi.MpiIbisStarter"/>
 		<attribute name="Ibis-IPL-Version" value="2.2"/>
 		<attribute name="Ibis-NickName" value="mpi"/>
-		<attribute name="Ibis-Implementation-Version" value="AAA" />
+		<attribute name="Ibis-Implementation-Version" value="${mpi.checksum}" />
 	    </manifest>
 	</jar>
 
