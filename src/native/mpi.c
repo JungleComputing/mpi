@@ -121,7 +121,13 @@ static struct ibisMPI_buf *getBuf(int sz) {
 
     ibisMPI_bufcache = p->next;
 
-    while (p->size < sz) p->size <<= 1;
+    if (p->size >= sz) {
+	return p;
+    }
+
+    do {
+	p->size <<= 1;
+    } while (p->size < sz);
     p->buf = realloc(p->buf, p->size);
     if (p->buf == NULL) {
 	return NULL;
@@ -411,7 +417,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_send(JNIEnv *env, job
 
     size = count * ibisMPI_typeSize[type];
     bufptr = getSendBuffer(env, buf, offset, count, type);
-    if(bufptr == NULL) return -1;
+    if(bufptr == NULL) {
+	return -1;
+    }
 
 #if DEBUG	
     fprintf(stderr, "%d: send of %d bytes to %d, tag is %d, type is %d (%d bytes/elt)\n", 
@@ -431,7 +439,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_send(JNIEnv *env, job
 
     freeSendBuffer(env, buf, type, bufptr);
 
-    if(res != MPI_SUCCESS) return -1;
+    if (res != MPI_SUCCESS) {
+	return -1;
+    }
 
     return 1;
 }
@@ -446,7 +456,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
 
     size = count * ibisMPI_typeSize[type];
     bufptr = getRcvBuffer(env, buf, offset, count, type);
-    if(bufptr == NULL) return -1;
+    if(bufptr == NULL) {
+	return -1;
+    }
 
 #if DEBUG
     fprintf(stderr, "%d: recv of %d bytes from %d, tag is %d\n", ibisMPI_rank, size, src, tag);
@@ -478,7 +490,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 
     size = count * ibisMPI_typeSize[type];
     bufptr = getSendBuffer(env, buf, offset, count, type);
-    if(bufptr == NULL) return -1;
+    if(bufptr == NULL) {
+	return -1;
+    }
 
     struct ibisMPI_request* req = allocRequest(bufptr);
     req->isSend = 1;
@@ -515,7 +529,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 
     size = count * ibisMPI_typeSize[type];
     bufptr = getRcvBuffer(env, buf, offset, count, type);
-    if(bufptr == NULL) return -1;
+    if(bufptr == NULL) {
+	return -1;
+    }
 
     struct ibisMPI_request* req = allocRequest(bufptr);
     req->isSend = 0;

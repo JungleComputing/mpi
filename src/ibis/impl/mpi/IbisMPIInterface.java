@@ -159,9 +159,9 @@ class IbisMPIInterface {
     int doSend(Object buf, int offset, int count, int type, int dest,
         int tag) {
         if (DEBUG && logger.isTraceEnabled()) {
-                logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
-                    + " off = " + offset + " count = " + count + " type = "
-                    + type + " dest = " + dest + " tag = " + tag);
+            logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
+                + " off = " + offset + " count = " + count + " type = "
+                + type + " dest = " + dest + " tag = " + tag);
         }
 
         if (SINGLE_THREAD) {
@@ -175,7 +175,13 @@ class IbisMPIInterface {
             myLock = new Integer(id);
             locks.put(myLock, myLock);
         }
-        return waitOrPoll(myLock, buf, offset, count, type);
+        int retval = waitOrPoll(myLock, buf, offset, count, type);
+        if (DEBUG && logger.isTraceEnabled()) {
+            logger.trace(rank + " send done, buflen = " + getBufLen(buf, type)
+                + " off = " + offset + " count = " + count + " type = "
+                + type + " dest = " + dest + " tag = " + tag);
+        }
+        return retval;
     }
 
     /**
@@ -264,7 +270,15 @@ class IbisMPIInterface {
             myLock = new Integer(id);
             locks.put(myLock, myLock);
         }
-        return waitOrPoll(myLock, buf, offset, count, type);
+
+        int retval = waitOrPoll(myLock, buf, offset, count, type);
+
+        if (DEBUG && logger.isTraceEnabled()) {
+            logger.trace(rank + " recv done, buflen = " + getBufLen(buf, type)
+                    + " off = " + offset + " count = " + count + " type = "
+                    + type + " src = " + src + " tag = " + tag);
+        }
+        return retval;
     }
 
     private int getBufLen(Object buf, int type) {

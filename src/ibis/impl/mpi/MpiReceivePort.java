@@ -39,9 +39,9 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                     for (;;) {
                         Thread.sleep(1000);
                         synchronized(port) {
-                            // If there is a reader, or a message is ready to be
-                            // delivered, continue.
-                            if (reader_busy || (message != null && ! delivered)) {
+                            // If there is a reader, or a message is active,
+                            // continue.
+                            if (reader_busy || ((MpiReceivePort)port).getPortMessage() != null) {
                                 continue;
                             }
                             if (in == null) {
@@ -177,6 +177,10 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                 && type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
                 && !type.hasCapability(PortType.RECEIVE_POLL)
                 && !type.hasCapability(PortType.RECEIVE_TIMEOUT);
+    }
+
+    private ReadMessage getPortMessage() {
+        return message;
     }
 
     synchronized void waitForDisconnects() {
