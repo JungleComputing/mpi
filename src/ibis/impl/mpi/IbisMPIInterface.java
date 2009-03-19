@@ -6,6 +6,7 @@ package ibis.impl.mpi;
 import ibis.io.SerializationFactory;
 import ibis.io.SerializationInput;
 import ibis.io.SerializationOutput;
+import ibis.util.TypedProperties;
 
 import java.util.HashMap;
 import java.util.Properties;
@@ -21,12 +22,6 @@ class IbisMPIInterface {
     private static final boolean DEBUG = false;
 
     static final boolean SINGLE_THREAD = false;
-
-    static final int MAX_POLLS = 100;
-
-    static final int NANO_SLEEP_TIME = 0; // don't sleep between polls
-
-    // static final int NANO_SLEEP_TIME = 10 * 1000; // 10 us
 
     static final int TYPE_BOOLEAN = 1;
     
@@ -75,6 +70,10 @@ class IbisMPIInterface {
     private int size;
 
     private int rank;
+    
+    private final int maxPolls;
+
+    private final int nanoSleepTime; // don't sleep between polls
 
     private CommInfo poller = null;
 
@@ -82,14 +81,18 @@ class IbisMPIInterface {
     
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
-            String libPath = props.getProperty("ibis.mpi.libpath");
+            TypedProperties properties = new TypedProperties(props);
+            String libPath = properties.getProperty("ibis.mpi.libpath");
             String sep = System.getProperty("file.separator");
 
             if (libPath != null) {
                 String s = System.mapLibraryName("IbisMPIInterface");
                 System.load(libPath + sep + s);
             }
-            instance = new IbisMPIInterface();
+            int polls = properties.getIntProperty("ibis.mpi.polls", 10);
+            int nanoSleepTime = properties.getIntProperty("ibis.mpi.nanosleep", 0);
+            
+            instance = new IbisMPIInterface(polls, nanoSleepTime);
         }
         return instance;
     }
@@ -98,7 +101,9 @@ class IbisMPIInterface {
         return instance;
     }
 
-    private IbisMPIInterface() {
+    private IbisMPIInterface(int polls, int nanoSleepTime) {
+        this.maxPolls = polls;
+        this.nanoSleepTime = nanoSleepTime;
         init();
         size = size();
         rank = rank();
@@ -222,7 +227,7 @@ class IbisMPIInterface {
                     releasePoller(myLock);
                     return myLock.getReturnValue();
                 }
-                int polls = MAX_POLLS;
+                int polls = maxPolls;
                 while (--polls >= 0) {
                     synchronized(this) {
                         int resultId = testAny();
@@ -242,7 +247,7 @@ class IbisMPIInterface {
                         }
                     }
                 }
-                nanosleep(NANO_SLEEP_TIME);
+                nanosleep(nanoSleepTime);
             } else {
                 if (myLock.waitForSignal()) {
                     releasePoller(myLock);
