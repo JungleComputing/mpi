@@ -174,7 +174,8 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
         // separate thread. But ONE_TO_MANY? Is not different to ONE_TO_ONE from
         // the receiveport perspective, or is it???
         lazy_connectionhandler_thread = upcall == null && connUpcall == null
-                && type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                && (type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                    || type.hasCapability(PortType.CONNECTION_ONE_TO_MANY))
                 && !type.hasCapability(PortType.RECEIVE_POLL)
                 && !type.hasCapability(PortType.RECEIVE_TIMEOUT);
     }
