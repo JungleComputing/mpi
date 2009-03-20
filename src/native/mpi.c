@@ -37,6 +37,7 @@ struct ibisMPI_buf {
     int size;
     struct ibisMPI_buf *next;
     void *buf;
+    void *jbuf;
 };
 
 static struct ibisMPI_buf *ibisMPI_bufcache;
@@ -109,6 +110,7 @@ static struct ibisMPI_buf *getBuf(int sz) {
 	    return NULL;
 	}
 	p->next = NULL;
+	p->jbuf = NULL;
 	p->size = 16;
 	while (p->size < sz) p->size <<= 1;
 	p->buf = malloc(p->size);
@@ -131,10 +133,12 @@ static struct ibisMPI_buf *getBuf(int sz) {
     if (p->buf == NULL) {
 	return NULL;
     }
+    p->jbuf = NULL;
     return p;
 }
 
 static void releaseBuf(struct ibisMPI_buf *p) {
+    p->jbuf = NULL;
     p->next = ibisMPI_bufcache;
     ibisMPI_bufcache = p;
 }
@@ -218,33 +222,33 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_rank
 static void freeSendBuffer(JNIEnv *env, jobject buf, jint type, void* bufptr) {
     if (noncopying) {
 	switch(type) {
-	    case TYPE_BOOLEAN:
-		(*env)->ReleaseBooleanArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_BYTE:
-		(*env)->ReleaseByteArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_CHAR:
-		(*env)->ReleaseCharArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_SHORT:
-		(*env)->ReleaseShortArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_INT:
-		(*env)->ReleaseIntArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_FLOAT:
-		(*env)->ReleaseFloatArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_LONG:
-		(*env)->ReleaseLongArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    case TYPE_DOUBLE:
-		(*env)->ReleaseDoubleArrayElements(env, buf, bufptr, JNI_ABORT);
-		break;
-	    default:
-		fprintf(stderr, "unknown type: %d\n", type);
-		break;
+	case TYPE_BOOLEAN:
+	    (*env)->ReleaseBooleanArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_BYTE:
+	    (*env)->ReleaseByteArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_CHAR:
+	    (*env)->ReleaseCharArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_SHORT:
+	    (*env)->ReleaseShortArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_INT:
+	    (*env)->ReleaseIntArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_FLOAT:
+	    (*env)->ReleaseFloatArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_LONG:
+	    (*env)->ReleaseLongArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	case TYPE_DOUBLE:
+	    (*env)->ReleaseDoubleArrayElements(env, buf, bufptr, JNI_ABORT);
+	    break;
+	default:
+	    fprintf(stderr, "unknown type: %d\n", type);
+	    break;
 	}
     } else {
 	free(bufptr);
@@ -257,35 +261,37 @@ static void* getWholeBuffer(JNIEnv *env, jobject buf, jint type) {
     void *b = NULL;
 
     switch(type) {
-	case TYPE_BOOLEAN:
-	    b = (*env)->GetBooleanArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_BYTE:
-	    b = (*env)->GetByteArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_CHAR:
-	    b = (*env)->GetCharArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_SHORT:
-	    b = (*env)->GetShortArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_INT:
-	    b = (*env)->GetIntArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_FLOAT:
-	    b = (*env)->GetFloatArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_LONG:
-	    b = (*env)->GetLongArrayElements(env, buf, &isCopy);
-	    break;
-	case TYPE_DOUBLE:
-	    b = (*env)->GetDoubleArrayElements(env, buf, &isCopy);
-	    break;
-	default:
-	    fprintf(stderr, "unknown type: %d\n", type);
-	    return NULL;
+    case TYPE_BOOLEAN:
+	b = (*env)->GetBooleanArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_BYTE:
+	b = (*env)->GetByteArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_CHAR:
+	b = (*env)->GetCharArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_SHORT:
+	b = (*env)->GetShortArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_INT:
+	b = (*env)->GetIntArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_FLOAT:
+	b = (*env)->GetFloatArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_LONG:
+	b = (*env)->GetLongArrayElements(env, buf, &isCopy);
+	break;
+    case TYPE_DOUBLE:
+	b = (*env)->GetDoubleArrayElements(env, buf, &isCopy);
+	break;
+    default:
+	fprintf(stderr, "unknown type: %d\n", type);
+	return NULL;
     }
     if (isCopy == JNI_TRUE) {
+	fprintf(stderr,
+		"Get...ArrayElements creates a copy, reverting to buffers\n");
 	freeSendBuffer(env, buf, type, b);
 	b = NULL;
 	noncopying = 0;
@@ -300,33 +306,33 @@ static void* getPartialBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
     if(bufptr == NULL) return NULL;
 
     switch(type) {
-	case TYPE_BOOLEAN:
-	    (*env)->GetBooleanArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_BYTE:
-	    (*env)->GetByteArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_CHAR:
-	    (*env)->GetCharArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_SHORT:
-	    (*env)->GetShortArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_INT:
-	    (*env)->GetIntArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_FLOAT:
-	    (*env)->GetFloatArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_LONG:
-	    (*env)->GetLongArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	case TYPE_DOUBLE:
-	    (*env)->GetDoubleArrayRegion(env, buf, offset, count, bufptr);
-	    break;
-	default:
-	    fprintf(stderr, "unknown type: %d\n", type);
-	    return NULL;
+    case TYPE_BOOLEAN:
+	(*env)->GetBooleanArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_BYTE:
+	(*env)->GetByteArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_CHAR:
+	(*env)->GetCharArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_SHORT:
+	(*env)->GetShortArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_INT:
+	(*env)->GetIntArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_FLOAT:
+	(*env)->GetFloatArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_LONG:
+	(*env)->GetLongArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    case TYPE_DOUBLE:
+	(*env)->GetDoubleArrayRegion(env, buf, offset, count, bufptr);
+	break;
+    default:
+	fprintf(stderr, "unknown type: %d\n", type);
+	return NULL;
     }
     return bufptr;
 }
@@ -347,6 +353,15 @@ static void* getSendBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
 
 static struct ibisMPI_buf *getRcvBuffer(JNIEnv *env, jobject buf, jint offset,
 	jint count, jint type) {
+    struct ibisMPI_buf *b;
+    if (noncopying) {
+	void *p = getWholeBuffer(env, buf, type);
+	if (noncopying) {
+	    b = getBuf(0);
+	    b->jbuf = p;
+	    return b;
+	}
+    }
     int size = count * ibisMPI_typeSize[type];
     return getBuf(size);
 }
@@ -357,34 +372,68 @@ static void freeRcvBuffer(JNIEnv *env, jobject buf, jint offset, jint count,
 
     struct ibisMPI_buf *p = (struct ibisMPI_buf *) bufptr;
 
-    switch(type) {
+    if (p->jbuf != NULL) {
+	switch(type) {
 	case TYPE_BOOLEAN:
-	    (*env)->SetBooleanArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseBooleanArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_BYTE:
-	    (*env)->SetByteArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseByteArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_CHAR:
-	    (*env)->SetCharArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseCharArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_SHORT:
-	    (*env)->SetShortArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseShortArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_INT:
-	    (*env)->SetIntArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseIntArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_FLOAT:
-	    (*env)->SetFloatArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseFloatArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_LONG:
-	    (*env)->SetLongArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseLongArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	case TYPE_DOUBLE:
-	    (*env)->SetDoubleArrayRegion(env, buf, offset, count, p->buf);
+	    (*env)->ReleaseDoubleArrayElements(env, buf, p->jbuf, 0);
 	    break;
 	default:
 	    fprintf(stderr, "unknown type: %d\n", type);
 	    break;
+	}
+	releaseBuf(p);
+	return;
+    }
+
+    switch(type) {
+    case TYPE_BOOLEAN:
+	(*env)->SetBooleanArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_BYTE:
+	(*env)->SetByteArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_CHAR:
+	(*env)->SetCharArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_SHORT:
+	(*env)->SetShortArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_INT:
+	(*env)->SetIntArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_FLOAT:
+	(*env)->SetFloatArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_LONG:
+	(*env)->SetLongArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    case TYPE_DOUBLE:
+	(*env)->SetDoubleArrayRegion(env, buf, offset, count, p->buf);
+	break;
+    default:
+	fprintf(stderr, "unknown type: %d\n", type);
+	break;
     }
     releaseBuf(p);
 }
@@ -446,7 +495,11 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
     fprintf(stderr, "%d: recv of %d bytes from %d, tag is %d\n", ibisMPI_rank, size, src, tag);
 #endif
 
-    res = MPI_Recv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &status);
+    if (bufptr->jbuf != NULL) {
+	res = MPI_Recv(bufptr->jbuf + offset*ibisMPI_typeSize[type], size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &status);
+    } else {
+	res = MPI_Recv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &status);
+    }
 
 #if DEBUG
     fprintf(stderr, "%d: recv of %d bytes from %d, tag is %d DONE\n", ibisMPI_rank, size, src, tag);
@@ -466,17 +519,18 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 	jobject jthis, jobject buf, jint offset, jint count,
 	jint type, jint dest, jint tag) {
-    void* bufptr;
-    int size;
     int res;
+    int size = count * ibisMPI_typeSize[type];
+    void *bufptr = getSendBuffer(env, buf, offset, count, type);
 
-    size = count * ibisMPI_typeSize[type];
-    bufptr = getSendBuffer(env, buf, offset, count, type);
     if(bufptr == NULL) {
 	return -1;
     }
 
     struct ibisMPI_request* req = allocRequest(bufptr);
+    if (req == NULL) {
+	return -1;
+    }
     req->isSend = 1;
 
     int index = req - &ibisMPI_requestInfoArray[0];
@@ -505,17 +559,18 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	jobject jthis, jobject buf, jint offset, jint count, jint type,
 	jint src, jint tag) {
-    struct ibisMPI_buf *bufptr;
-    int size;
     int res;
+    int size = count * ibisMPI_typeSize[type];
+    struct ibisMPI_buf *bufptr = getRcvBuffer(env, buf, offset, count, type);
 
-    size = count * ibisMPI_typeSize[type];
-    bufptr = getRcvBuffer(env, buf, offset, count, type);
     if(bufptr == NULL) {
 	return -1;
     }
 
     struct ibisMPI_request* req = allocRequest(bufptr);
+    if (req == NULL) {
+	return -1;
+    }
     req->isSend = 0;
 
     int index = req - &ibisMPI_requestInfoArray[0];
@@ -525,7 +580,11 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
-    res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
+    if (bufptr->jbuf != NULL) {
+	res = MPI_Irecv(bufptr->jbuf + offset*ibisMPI_typeSize[type], size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
+    } else {
+	res = MPI_Irecv(bufptr->buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &ibisMPI_requestArray[index]);
+    }
 
 #if DEBUG
     fprintf(stderr, "%d: Irecv of %d bytes from %d, tag is %d, type is %d (%d bytes/elt) ID = %d DONE, SUCCESS = %d\n", 
