@@ -131,27 +131,6 @@ class IbisMPIInterface {
         } catch (Exception e) { // ignore 
         }
     }
-
-    private synchronized boolean getPollToken(CommInfo myLock) {
-        if (poller == null || myLock == poller) {
-            poller = myLock;
-            return true;
-        }
-        return false;
-    }
-
-    private synchronized void releasePoller(CommInfo id) {
-        locks.remove(new Integer(id.getId()));
-        // If id was the poller, select another poller.
-        if (poller == id) {
-            poller = null;
-            for (CommInfo d : locks.values()) {
-                poller = d;
-                d.signal();
-                return;
-            }
-        }
-    }
     
     int doRecv(Object buf, int offset, int count, int type, int src,
             int tag) {
@@ -171,9 +150,13 @@ class IbisMPIInterface {
                 int id = irecv(buf, offset, count, type, src, tag);
                 myLock = new CommInfo(id, buf, offset, count, type);
                 locks.put(new Integer(id), myLock);
+                if (poller == null) {
+                    poller = myLock;
+                    poller.signal();
+                }
             }
 
-            int retval = waitOrPoll(myLock, buf, offset, count, type);
+            int retval = waitOrPoll(myLock);
 
             if (DEBUG && logger.isTraceEnabled()) {
                 logger.trace(rank + " recv done, buflen = " + getBufLen(buf, type)
@@ -202,8 +185,12 @@ class IbisMPIInterface {
             int id = isend(buf, offset, count, type, dest, tag);
             myLock = new CommInfo(id, buf, offset, count, type);
             locks.put(new Integer(id), myLock);
+            if (poller == null) {
+                poller = myLock;
+                poller.signal();
+            }
         }
-        int retval = waitOrPoll(myLock, buf, offset, count, type);
+        int retval = waitOrPoll(myLock);
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " send done, buflen = " + getBufLen(buf, type)
                 + " off = " + offset + " count = " + count + " type = "
@@ -211,50 +198,54 @@ class IbisMPIInterface {
         }
         return retval;
     }
+    
+    private void poll(CommInfo myLock) {
+        
+        int id = myLock.getId();
+ 
+        for (int polls = maxPolls; polls > 0; polls--) {
+            synchronized(this) {
+                int resultId = testAny();
+                if (resultId != -1) {
+                    Integer dd = new Integer(resultId);
+                    CommInfo d = locks.get(dd);
+                    int size = getResultSize(d.buf, d.offset, d.count, d.type);
+                    d.setReturnValue(size);
+                    if (resultId == id) {
+                        return;
+                    }
+                } else {
+                    // nothing finished
+                }
+            }
+        }
+        nanosleep(nanoSleepTime);
+    }
 
     /**
      * Returns the number of bytes written/read.
      */
-    private int waitOrPoll(CommInfo myLock, Object buf, int offset, int count, int type) {
-
-        int id = myLock.getId();
+    private int waitOrPoll(CommInfo myLock) {
         while (true) {
-            boolean iAmPoller = getPollToken(myLock);
-            if (iAmPoller) {
-                // myLock may actually have been signalled now, so test
-                // for that.
-                if (myLock.hasReturnValue()) {
-                    releasePoller(myLock);
-                    return myLock.getReturnValue();
-                }
-                int polls = maxPolls;
-                while (--polls >= 0) {
-                    synchronized(this) {
-                        int resultId = testAny();
-                        if (resultId != -1) {
-                            Integer dd = new Integer(resultId);
-                            CommInfo d = locks.get(dd);
-                            int size = getResultSize(d.buf, d.offset, d.count, d.type);
-                            if (resultId == id) {
-                                releasePoller(myLock);
-                                return size;
-                            }
-                            // some operation posted by another thread (not the poller)
-                            // was done. Notify it.
-                            d.setReturnValue(size);
-                        } else {
-                            // nothing finished
+            if (myLock.waitForSignal()) {
+                // I have a return value!
+                synchronized(this) {
+                    locks.remove(new Integer(myLock.getId()));
+                    // If myLock was the poller, select another poller.
+                    if (poller == myLock) {
+                        poller = null;
+                        for (CommInfo d : locks.values()) {
+                            poller = d;
+                            d.signal();
+                            break;
                         }
                     }
                 }
-                nanosleep(nanoSleepTime);
-            } else {
-                if (myLock.waitForSignal()) {
-                    releasePoller(myLock);
-                    return myLock.getReturnValue();
-                }
+                return myLock.getReturnValue();
             }
-        } // end of while
+            // Other reason I am being signalled: I became poller.
+            poll(myLock);
+        }
     }
 
     private int getBufLen(Object buf, int type) {

@@ -53,7 +53,6 @@ public final class CommInfo {
                 // ignored
             }
         }
-        signalled = false;
         return hasReturnValue;
     }
 
