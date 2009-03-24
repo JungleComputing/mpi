@@ -1,6 +1,6 @@
 /* The code here does not have to be thread safe, it is synchronized from the
    Java side.
-   */
+*/
 
 #include <mpi.h>
 #include <jni.h>
@@ -22,16 +22,14 @@ static int ibisMPI_rank;
 static int ibisMPI_size;
 static int* ibisMPI_typeSize;
 
-static int ibisMPI_currentId;
-
 static int noncopying = 1;
 
 struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
-    int size;
     int offset;
     int type;
+    int size;
     void* buffer;
 };
 
@@ -48,7 +46,6 @@ struct ibisMPI_request* ibisMPI_requestInfoArray;
 static MPI_Request *ibisMPI_requestArray;
 static int ibisMPI_requestArraySize;
 static int ibisMPI_requestsUsed;
-
 
 /*
  * Class:     ibis_mpi_IbisMPI
@@ -81,8 +78,6 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
     ibisMPI_typeSize[TYPE_FLOAT] = 4;
     ibisMPI_typeSize[TYPE_LONG] = 8;
     ibisMPI_typeSize[TYPE_DOUBLE] = 8;
-
-    ibisMPI_currentId = 0;
 
     ibisMPI_requestArraySize = 32;
     ibisMPI_requestArray = (MPI_Request *)
@@ -176,7 +171,6 @@ static struct ibisMPI_request* allocRequest(void* buffer) {
 	return NULL;
     }
 
-    res->id = ibisMPI_currentId++;
     res->buffer = buffer;
     return res;
 }
@@ -520,7 +514,7 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_recv(JNIEnv *env,
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 	jobject jthis, jobject buf, jint offset, jint count,
-	jint type, jint dest, jint tag) {
+	jint type, jint dest, jint tag, jint id) {
     int res;
     int size = count * ibisMPI_typeSize[type];
     void *bufptr = getSendBuffer(env, buf, offset, count, type);
@@ -533,7 +527,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
     if (req == NULL) {
 	return -1;
     }
+    req->id = id;
     req->isSend = 1;
+    req->size = size;
     req->offset = offset;
     req->type = type;
 
@@ -555,14 +551,15 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 	    ibisMPI_rank, size, dest, tag, type, ibisMPI_typeSize[type], req->id);
 #endif
 
-    if(res != MPI_SUCCESS) return -1;
-
-    return req->id;
+    if(res != MPI_SUCCESS) {
+	return -1;
+    }
+    return 0;
 }
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	jobject jthis, jobject buf, jint offset, jint count, jint type,
-	jint src, jint tag) {
+	jint src, jint tag, jint id) {
     int res;
     int size = count * ibisMPI_typeSize[type];
     struct ibisMPI_buf *bufptr = getRcvBuffer(env, buf, offset, count, type);
@@ -575,6 +572,7 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
     if (req == NULL) {
 	return -1;
     }
+    req->id = id;
     req->isSend = 0;
     req->offset = offset;
     req->type = type;
@@ -597,12 +595,13 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	    ibisMPI_rank, size, src, tag, type, ibisMPI_typeSize[type], req->id, res == MPI_SUCCESS);
 #endif
 
-    if(res != MPI_SUCCESS) return -1;
-
-    return req->id;
+    if(res != MPI_SUCCESS) {
+	return -1;
+    }
+    return 0;
 }
 
-static  struct ibisMPI_request *savedReq;
+static struct ibisMPI_request *savedReq;
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAny
 (JNIEnv *env, jobject jthis) {
@@ -635,7 +634,6 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAny
 
     return req->id;
 }
-
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_getResultSize
 (JNIEnv *env, jobject jthis, jobject buf) {

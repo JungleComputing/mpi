@@ -8,7 +8,7 @@ import ibis.io.SerializationInput;
 import ibis.io.SerializationOutput;
 import ibis.util.TypedProperties;
 
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.Properties;
 
 import org.slf4j.Logger;
@@ -53,13 +53,13 @@ class IbisMPIInterface {
         int type, int dest, int tag);
 
     synchronized native int isend(Object buf, int offset, int count,
-        int type, int dest, int tag);
+        int type, int dest, int tag, int id);
 
     synchronized native int recv(Object buf, int offset, int count,
         int type, int src, int tag);
 
     synchronized native int irecv(Object buf, int offset, int count,
-        int type, int src, int tag);
+        int type, int src, int tag, int id);
 
     native int testAny();
 
@@ -76,9 +76,7 @@ class IbisMPIInterface {
     private final int nanoSleepTime; // don't sleep between polls
 
     private CommInfo poller = null;
-
-    private HashMap<Integer, CommInfo> locks = new HashMap<Integer, CommInfo>();
-    
+   
     static synchronized IbisMPIInterface createMpi(Properties props) {
         if (instance == null) {
             TypedProperties properties = new TypedProperties(props);
@@ -133,7 +131,7 @@ class IbisMPIInterface {
     }
     
     int doRecv(Object buf, int offset, int count, int type, int src,
-            int tag) {
+            int tag) throws IOException {
             if (DEBUG && logger.isTraceEnabled()) {
                 logger.trace(rank + " doing recv, buflen = " + getBufLen(buf, type)
                         + " off = " + offset + " count = " + count + " type = "
@@ -146,10 +144,12 @@ class IbisMPIInterface {
 
             // use asynchronous recv
             CommInfo myLock;
+            
             synchronized(this) {
-                int id = irecv(buf, offset, count, type, src, tag);
-                myLock = new CommInfo(id, buf);
-                locks.put(new Integer(id), myLock);
+                myLock = CommInfo.getCommInfo(buf);
+                if (irecv(buf, offset, count, type, src, tag, myLock.getId()) < 0) {
+                    throw new IOException("irecv failed");
+                }
                 if (poller == null) {
                     poller = myLock;
                     poller.signal();
@@ -168,7 +168,7 @@ class IbisMPIInterface {
 
 
     int doSend(Object buf, int offset, int count, int type, int dest,
-        int tag) {
+        int tag) throws IOException {
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
                 + " off = " + offset + " count = " + count + " type = "
@@ -181,41 +181,41 @@ class IbisMPIInterface {
 
         // use asynchronous sends
         CommInfo myLock;
+
         synchronized(this) {
-            int id = isend(buf, offset, count, type, dest, tag);
-            myLock = new CommInfo(id, buf);
-            locks.put(new Integer(id), myLock);
+            myLock = CommInfo.getCommInfo(buf);
+            if (isend(buf, offset, count, type, dest, tag, myLock.getId()) < 0) {
+                
+                throw new IOException("isend failed");
+            }
             if (poller == null) {
                 poller = myLock;
                 poller.signal();
             }
         }
+        
         int retval = waitOrPoll(myLock);
+        
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " send done, buflen = " + getBufLen(buf, type)
                 + " off = " + offset + " count = " + count + " type = "
                 + type + " dest = " + dest + " tag = " + tag);
         }
+        
         return retval;
     }
     
-    private void poll(CommInfo myLock) {
-        
-        int id = myLock.getId();
- 
+    private void poll(int id) {
         for (int polls = maxPolls; polls > 0; polls--) {
             synchronized(this) {
                 int resultId = testAny();
                 if (resultId != -1) {
-                    Integer dd = new Integer(resultId);
-                    CommInfo d = locks.get(dd);
+                    CommInfo d = CommInfo.getCommInfo(resultId);
                     int size = getResultSize(d.buf);
                     d.setReturnValue(size);
                     if (resultId == id) {
                         return;
                     }
-                } else {
-                    // nothing finished
                 }
             }
         }
@@ -226,25 +226,25 @@ class IbisMPIInterface {
      * Returns the number of bytes written/read.
      */
     private int waitOrPoll(CommInfo myLock) {
+	int id = myLock.getId();
         while (true) {
             if (myLock.waitForSignal()) {
                 // I have a return value!
+                int retval = myLock.getReturnValue();
                 synchronized(this) {
-                    locks.remove(new Integer(myLock.getId()));
+                    CommInfo.releaseCommInfo(myLock);
                     // If myLock was the poller, select another poller.
                     if (poller == myLock) {
-                        poller = null;
-                        for (CommInfo d : locks.values()) {
-                            poller = d;
-                            d.signal();
-                            break;
+                        poller = CommInfo.getBusy();
+                        if (poller != null) {
+                            poller.signal();
                         }
                     }
                 }
-                return myLock.getReturnValue();
+                return retval;
             }
             // Other reason I am being signalled: I became poller.
-            poll(myLock);
+            poll(id);
         }
     }
 
@@ -276,7 +276,7 @@ class IbisMPIInterface {
      * Test main entry.
      * @param args program arguments.
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
         boolean verify = true;
 

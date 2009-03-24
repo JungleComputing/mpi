@@ -41,12 +41,6 @@ public class MpiDataInputStream extends DataInputStream {
         // nothing to do
     }
 
-    public boolean readBoolean() throws IOException {
-        mpi.doRecv(tmpBoolean, 0, 1, IbisMPIInterface.TYPE_BOOLEAN, srcRank,
-                srcTag);
-        return tmpBoolean[0];
-    }
-
     public void resetBytesRead() {
         bytesRead = 0;
     }
@@ -103,6 +97,12 @@ public class MpiDataInputStream extends DataInputStream {
         mpi.doRecv(tmpByte, 0, 1, IbisMPIInterface.TYPE_BYTE, srcRank,
                 srcTag);
         return tmpByte[0];
+    }
+    
+    public boolean readBoolean() throws IOException {
+        mpi.doRecv(tmpBoolean, 0, 1, IbisMPIInterface.TYPE_BOOLEAN, srcRank,
+                srcTag);
+        return tmpBoolean[0];
     }
 
     public char readChar() throws IOException {
@@ -165,3 +165,4 @@ public class MpiDataInputStream extends DataInputStream {
         return -1;
     }
 }
+
