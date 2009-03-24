@@ -13,22 +13,13 @@ public final class CommInfo {
 
     Object buf;
 
-    int count;
-    
-    int type;
-
-    int offset;
-    
     private boolean signalled = false;
     
     private boolean hasReturnValue = false;
     
-    public CommInfo(int id, Object buf, int offset, int count, int type) {
+    public CommInfo(int id, Object buf) {
         this.id = id;
         this.buf = buf;
-        this.count = count;
-        this.offset = offset;
-        this.type = type;
     }
     
     public int getId() {

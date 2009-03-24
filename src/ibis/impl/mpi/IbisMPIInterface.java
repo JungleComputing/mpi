@@ -63,7 +63,7 @@ class IbisMPIInterface {
 
     native int testAny();
 
-    native int getResultSize(Object buf, int offset, int count, int type);
+    native int getResultSize(Object buf);
 
     private static IbisMPIInterface instance;
 
@@ -148,7 +148,7 @@ class IbisMPIInterface {
             CommInfo myLock;
             synchronized(this) {
                 int id = irecv(buf, offset, count, type, src, tag);
-                myLock = new CommInfo(id, buf, offset, count, type);
+                myLock = new CommInfo(id, buf);
                 locks.put(new Integer(id), myLock);
                 if (poller == null) {
                     poller = myLock;
@@ -183,7 +183,7 @@ class IbisMPIInterface {
         CommInfo myLock;
         synchronized(this) {
             int id = isend(buf, offset, count, type, dest, tag);
-            myLock = new CommInfo(id, buf, offset, count, type);
+            myLock = new CommInfo(id, buf);
             locks.put(new Integer(id), myLock);
             if (poller == null) {
                 poller = myLock;
@@ -209,7 +209,7 @@ class IbisMPIInterface {
                 if (resultId != -1) {
                     Integer dd = new Integer(resultId);
                     CommInfo d = locks.get(dd);
-                    int size = getResultSize(d.buf, d.offset, d.count, d.type);
+                    int size = getResultSize(d.buf);
                     d.setReturnValue(size);
                     if (resultId == id) {
                         return;

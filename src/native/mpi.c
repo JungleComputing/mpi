@@ -30,6 +30,8 @@ struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
     int size;
+    int offset;
+    int type;
     void* buffer;
 };
 
@@ -532,6 +534,8 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
 	return -1;
     }
     req->isSend = 1;
+    req->offset = offset;
+    req->type = type;
 
     int index = req - &ibisMPI_requestInfoArray[0];
 
@@ -572,6 +576,8 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_irecv(JNIEnv *env,
 	return -1;
     }
     req->isSend = 0;
+    req->offset = offset;
+    req->type = type;
 
     int index = req - &ibisMPI_requestInfoArray[0];
 
@@ -632,13 +638,13 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_testAny
 
 
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_getResultSize
-(JNIEnv *env, jobject jthis, jobject buf, jint offset, jint count, jint type) {
+(JNIEnv *env, jobject jthis, jobject buf) {
     struct ibisMPI_request *req = savedReq;
 
     if (req->isSend) {
-	freeSendBuffer(env, buf, type, req->buffer);
+	freeSendBuffer(env, buf, req->type, req->buffer);
     } else {
-	freeRcvBuffer(env, buf, offset, req->size/ibisMPI_typeSize[type], type, req->buffer);
+	freeRcvBuffer(env, buf, req->offset, req->size/ibisMPI_typeSize[req->type], req->type, req->buffer);
     }
     int size = req->size;
     deleteRequest(req);
