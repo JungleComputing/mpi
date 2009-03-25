@@ -8,6 +8,9 @@
 
 #define DEBUG 0
 
+/* Number of tests after asynchronous send. */
+#define NUM_TESTS 10
+
 #define TYPE_BOOLEAN 1
 #define TYPE_BYTE 2
 #define TYPE_CHAR 3
@@ -286,8 +289,10 @@ static void* getWholeBuffer(JNIEnv *env, jobject buf, jint type) {
 	return NULL;
     }
     if (isCopy == JNI_TRUE) {
+#if DEBUG
 	fprintf(stderr,
 		"Get...ArrayElements creates a copy, reverting to buffers\n");
+#endif
 	freeSendBuffer(env, buf, type, b);
 	b = NULL;
 	noncopying = 0;
@@ -554,6 +559,21 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_isend(JNIEnv *env,
     if(res != MPI_SUCCESS) {
 	return -1;
     }
+
+#if NUM_TESTS > 0
+    MPI_Status status;
+    int flag;
+    int i;
+
+    for (i = 0; i < NUM_TESTS; i++) {
+	res = MPI_Test(&ibisMPI_requestArray[index], &flag, &status);
+	if (flag) {
+	    freeSendBuffer(env, buf, type, req->buffer);
+	    deleteRequest(req);
+	    return 1;
+	}
+    }
+#endif
     return 0;
 }
 

@@ -167,7 +167,7 @@ class IbisMPIInterface {
         }
 
 
-    int doSend(Object buf, int offset, int count, int type, int dest,
+    void doSend(Object buf, int offset, int count, int type, int dest,
         int tag) throws IOException {
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " doing send, buflen = " + getBufLen(buf, type)
@@ -176,7 +176,8 @@ class IbisMPIInterface {
         }
 
         if (SINGLE_THREAD) {
-            return send(buf, offset, count, type, dest, tag);
+            send(buf, offset, count, type, dest, tag);
+            return;
         }
 
         // use asynchronous sends
@@ -184,9 +185,20 @@ class IbisMPIInterface {
 
         synchronized(this) {
             myLock = CommInfo.getCommInfo(buf);
-            if (isend(buf, offset, count, type, dest, tag, myLock.getId()) < 0) {
-                
+            int retval = isend(buf, offset, count, type, dest, tag, myLock.getId());
+            if (retval < 0) {
                 throw new IOException("isend failed");
+            }
+            if (retval > 0) {
+                // send already finished!
+                if (DEBUG && logger.isTraceEnabled()) {
+                    logger.trace(rank + " quick send done, buflen = "
+                            + getBufLen(buf, type) + " off = " + offset
+                            + " count = " + count + " type = " + type +
+                            " dest = " + dest + " tag = " + tag);
+                }
+                CommInfo.releaseCommInfo(myLock);
+                return;
             }
             if (poller == null) {
                 poller = myLock;
@@ -194,17 +206,15 @@ class IbisMPIInterface {
             }
         }
         
-        int retval = waitOrPoll(myLock);
+        waitOrPoll(myLock);
         
         if (DEBUG && logger.isTraceEnabled()) {
             logger.trace(rank + " send done, buflen = " + getBufLen(buf, type)
                 + " off = " + offset + " count = " + count + " type = "
                 + type + " dest = " + dest + " tag = " + tag);
         }
-        
-        return retval;
     }
-    
+
     private void poll(int id) {
         for (int polls = maxPolls; polls > 0; polls--) {
             synchronized(this) {

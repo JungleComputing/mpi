@@ -7,32 +7,50 @@ import java.util.ArrayList;
  * Also serves as lock.
  */
 public final class CommInfo {
-    
+
     private static final ArrayList<CommInfo> infos = new ArrayList<CommInfo>();
-    
-    private static final ArrayList<CommInfo> frees = new ArrayList<CommInfo>();
-    
-    private static final ArrayList<CommInfo> busies = new ArrayList<CommInfo>();
+
+    // Single linked list.
+    private static CommInfo frees = null;
+
+    // Double linked list.
+    private static CommInfo busies = null;
     
     public static CommInfo getCommInfo(Object buf) {
-        int freeSize = frees.size();
         CommInfo result;
-        if (freeSize == 0) {
+        if (frees == null) {
             result = new CommInfo(infos.size());
             infos.add(result);
         } else {
-            result = frees.remove(freeSize - 1);
+            result = frees;
+            frees = frees.next;
             result.hasReturnValue = false;
             result.signalled = false;
         }
-        busies.add(result);
+        if (busies != null) {
+            busies.prev = result;
+        }
+        result.next = busies;
+        result.prev = null;
+        busies = result;
         result.buf = buf;
         return result;
     }
     
     public static void releaseCommInfo(CommInfo e) {
-        frees.add(e);
-        busies.remove(e);
+        if (e == busies) {
+            busies = busies.next;
+            if (busies != null) {
+                busies.prev = null;
+            }
+        } else {
+            e.prev.next = e.next;
+            if (e.next != null) {
+                e.next.prev = e.prev;
+            }
+        }
+        e.next = frees;
+        frees = e;
     }
     
     public static CommInfo getCommInfo(int id) {
@@ -40,10 +58,7 @@ public final class CommInfo {
     }
     
     public static CommInfo getBusy() {
-        if (busies.size() == 0) {
-            return null;
-        }
-        return busies.get(0);
+        return busies;
     }
     
     /** Id of the communication operation. */
@@ -52,12 +67,16 @@ public final class CommInfo {
     /** Return value of the communication operation. */
     private int retval;
 
+    /** Link for frees or busies. */
+    private CommInfo next;
+    private CommInfo prev;
+
     Object buf;
 
     private boolean signalled = false;
     
     private boolean hasReturnValue = false;
-    
+
     private CommInfo(int id) {
         this.id = id;
     }
