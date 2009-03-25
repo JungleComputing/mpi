@@ -12,6 +12,7 @@ import ibis.ipl.impl.ReceivePortConnectionInfo;
 import ibis.ipl.impl.ReceivePortIdentifier;
 import ibis.ipl.impl.SendPortIdentifier;
 import ibis.util.ThreadPool;
+import ibis.io.BufferedArrayInputStream;
 import ibis.io.Conversion;
 import ibis.io.DataInputStream;
 
@@ -285,6 +286,9 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
     synchronized void connect(SendPortIdentifier origin, int tag, int rank)
             throws IOException {
         DataInputStream in = new MpiDataInputStream(rank, tag);
+        if (((MpiIbis) ibis).useBufferedArrayStreams) {
+            in = new BufferedArrayInputStream(in, 4096);
+        }
         ConnectionHandler conn = new ConnectionHandler(origin, this, in);
         ThreadPool.createNew(conn, "ConnectionHandler");
     }

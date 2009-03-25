@@ -21,6 +21,7 @@ import ibis.ipl.impl.SendPortIdentifier;
 import ibis.ipl.registry.Credentials;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
+import ibis.util.TypedProperties;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -66,11 +67,16 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     private HashMap<IbisIdentifier, Integer> map
             = new HashMap<IbisIdentifier, Integer>();
     
+    final boolean useBufferedArrayStreams;
+    
     public MpiIbis(RegistryEventHandler registryEventHandler,
             IbisCapabilities capabilities, Credentials credentials,
             PortType[] types, Properties userProperties, IbisStarter starter) {
         super(registryEventHandler, capabilities, credentials, types,
                 userProperties, starter);
+        TypedProperties properties = new TypedProperties(properties());
+        useBufferedArrayStreams
+                = properties.getBooleanProperty("ibis.mpi.bufferedStreams", false);
         ThreadPool.createNew(this, "MpiIbis");
     }
     
@@ -407,6 +413,9 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     protected ibis.ipl.SendPort doCreateSendPort(PortType tp, String nm,
             SendPortDisconnectUpcall cU, Properties props)
             throws IOException {
+        if (useBufferedArrayStreams) {
+            return new MpiBufferedArraySendPort(this, tp, nm, cU, props);
+        }
         return new MpiSendPort(this, tp, nm, cU, props);
     }
 

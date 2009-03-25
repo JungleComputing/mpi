@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Properties;
 
-final class MpiSendPort extends SendPort implements MpiProtocol {
+class MpiSendPort extends SendPort implements MpiProtocol {
 
     private class Conn extends SendPortConnectionInfo {
         DataOutputStream out;
@@ -38,20 +38,28 @@ final class MpiSendPort extends SendPort implements MpiProtocol {
 
     final DataOutputStreamSplitter splitter;
 
-    private static int tag = 0;
+    protected static int tag = 0;
     
-    private final boolean portNumbered;
+    protected final boolean portNumbered;
+    
+    protected final boolean multipleReceivers;
 
     MpiSendPort(Ibis ibis, PortType type, String name,
             SendPortDisconnectUpcall cU, Properties props) throws IOException {
         super(ibis, type, name, cU, props);
+        if (this.getClass().equals(MpiSendPort.class)) {
 
-        splitter = new DataOutputStreamSplitter(
-                ! type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
-                && ! type.hasCapability(PortType.CONNECTION_MANY_TO_ONE));
- 
-        initStream(splitter);
+            splitter = new DataOutputStreamSplitter(
+                    ! type.hasCapability(PortType.CONNECTION_ONE_TO_ONE)
+                    && ! type.hasCapability(PortType.CONNECTION_MANY_TO_ONE));
+
+            initStream(splitter);
+        } else {
+            splitter = null;
+        }
         portNumbered = type.hasCapability(PortType.COMMUNICATION_NUMBERED);
+        multipleReceivers = type.hasCapability(PortType.CONNECTION_ONE_TO_MANY)
+                || type.hasCapability(PortType.CONNECTION_MANY_TO_MANY);
     }
 
     SendPortIdentifier getIdent() {
