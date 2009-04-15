@@ -71,8 +71,9 @@
     <target name="dist" depends="build,javadoc" description="build the JAR file and documentation" />
 
     <target name="javadoc" depends="compile" description="generate all javadocs">
-	<javadoc destdir="${doc}/javadoc" access="public" packagenames="ibis.mpi.*" sourcepath="${src}" overview="src/ibis/mpi/package.html">
+	<javadoc destdir="${doc}/javadoc" access="public" packagenames="ibis.impl.mpi.*" sourcepath="${src}" overview="src/ibis/impl/mpi/package.html">
 	    <link href="http://java.sun.com/j2se/1.4.2/docs/api/" />
+	    <classpath refid="external_jars" />
 	</javadoc>
 
 	<!-- And delete the build dir -->
