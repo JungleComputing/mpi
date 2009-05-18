@@ -8,7 +8,7 @@ import ibis.ipl.IbisCapabilities;
 import ibis.ipl.IbisFactory;
 import ibis.ipl.PortType;
 import ibis.ipl.RegistryEventHandler;
-import ibis.ipl.registry.Credentials;
+import ibis.ipl.Credentials;
 
 import java.util.ArrayList;
 import java.util.Properties;
@@ -85,9 +85,10 @@ public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
     
     public Ibis startIbis(IbisFactory factory,
             RegistryEventHandler registryEventHandler, Properties userProperties,
-            IbisCapabilities capabilities, Credentials credentials, PortType[] portTypes, String specifiedSubImplementation) {
+            IbisCapabilities capabilities, Credentials credentials,
+            byte[] tag, PortType[] portTypes, String specifiedSubImplementation) {
         return new MpiIbis(registryEventHandler, capabilities, credentials,
-                portTypes, userProperties, this);
+                tag, portTypes, userProperties, this);
     }
     
     public boolean isSelectable() {

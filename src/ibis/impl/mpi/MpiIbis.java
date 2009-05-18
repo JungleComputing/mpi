@@ -7,6 +7,7 @@ import ibis.io.BufferedArrayOutputStream;
 import ibis.ipl.AlreadyConnectedException;
 import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
+import ibis.ipl.Credentials;
 import ibis.ipl.IbisCapabilities;
 import ibis.ipl.IbisStarter;
 import ibis.ipl.MessageUpcall;
@@ -18,7 +19,6 @@ import ibis.ipl.SendPortDisconnectUpcall;
 import ibis.ipl.impl.IbisIdentifier;
 import ibis.ipl.impl.ReceivePort;
 import ibis.ipl.impl.SendPortIdentifier;
-import ibis.ipl.registry.Credentials;
 import ibis.util.IPUtils;
 import ibis.util.ThreadPool;
 import ibis.util.TypedProperties;
@@ -71,8 +71,8 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     
     public MpiIbis(RegistryEventHandler registryEventHandler,
             IbisCapabilities capabilities, Credentials credentials,
-            PortType[] types, Properties userProperties, IbisStarter starter) {
-        super(registryEventHandler, capabilities, credentials, types,
+            byte[] tag, PortType[] types, Properties userProperties, IbisStarter starter) {
+        super(registryEventHandler, capabilities, credentials, tag, types,
                 userProperties, starter);
         TypedProperties properties = new TypedProperties(properties());
         useBufferedArrayStreams
