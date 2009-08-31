@@ -5,6 +5,7 @@ package ibis.impl.mpi;
 import ibis.ipl.CapabilitySet;
 import ibis.ipl.Ibis;
 import ibis.ipl.IbisCapabilities;
+import ibis.ipl.IbisCreationFailedException;
 import ibis.ipl.IbisFactory;
 import ibis.ipl.PortType;
 import ibis.ipl.RegistryEventHandler;
@@ -86,7 +87,7 @@ public final class MpiIbisStarter extends ibis.ipl.IbisStarter {
     public Ibis startIbis(IbisFactory factory,
             RegistryEventHandler registryEventHandler, Properties userProperties,
             IbisCapabilities capabilities, Credentials credentials,
-            byte[] tag, PortType[] portTypes, String specifiedSubImplementation) {
+            byte[] tag, PortType[] portTypes, String specifiedSubImplementation) throws IbisCreationFailedException {
         return new MpiIbis(registryEventHandler, capabilities, credentials,
                 tag, portTypes, userProperties, this);
     }

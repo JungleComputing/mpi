@@ -9,6 +9,7 @@ import ibis.ipl.ConnectionRefusedException;
 import ibis.ipl.ConnectionTimedOutException;
 import ibis.ipl.Credentials;
 import ibis.ipl.IbisCapabilities;
+import ibis.ipl.IbisCreationFailedException;
 import ibis.ipl.IbisStarter;
 import ibis.ipl.MessageUpcall;
 import ibis.ipl.PortMismatchException;
@@ -71,7 +72,7 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
     
     public MpiIbis(RegistryEventHandler registryEventHandler,
             IbisCapabilities capabilities, Credentials credentials,
-            byte[] tag, PortType[] types, Properties userProperties, IbisStarter starter) {
+            byte[] tag, PortType[] types, Properties userProperties, IbisStarter starter) throws IbisCreationFailedException {
         super(registryEventHandler, capabilities, credentials, tag, types,
                 userProperties, starter);
         TypedProperties properties = new TypedProperties(properties());
