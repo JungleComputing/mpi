@@ -6,6 +6,7 @@ package ibis.impl.mpi;
 import ibis.io.DataOutputStream;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class MpiDataOutputStream extends DataOutputStream {
     int tag;
@@ -128,5 +129,18 @@ public class MpiDataOutputStream extends DataOutputStream {
     @Override
     public int bufferSize() {
         return -1;
+    }
+
+    @Override
+    public void writeByteBuffer(ByteBuffer value) throws IOException {
+	int len = value.limit() - value.position();
+	if (value.hasArray()) {
+	    mpi.doSend(value.array(), value.arrayOffset(), len, IbisMPIInterface.TYPE_BYTE, destRank, tag);
+	} else {
+	    // TODO: improve in native code?
+            byte[] b = new byte[len];
+            value.get(b, 0, len);
+            mpi.doSend(b, 0, len, IbisMPIInterface.TYPE_BYTE, destRank, tag);
+	}
     }
 }

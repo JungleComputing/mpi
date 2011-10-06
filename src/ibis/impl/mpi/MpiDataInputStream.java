@@ -6,6 +6,8 @@ package ibis.impl.mpi;
 import ibis.io.DataInputStream;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 // Note: this stream implementation does NOT support SUN serialization!
 
@@ -163,6 +165,22 @@ public class MpiDataInputStream extends DataInputStream {
     @Override
     public int bufferSize() {
         return -1;
+    }
+
+    @Override
+    public void readByteBuffer(ByteBuffer value) throws IOException,
+	    ReadOnlyBufferException {
+	
+	int len = value.limit() - value.position();
+	if (value.hasArray()) {
+    	    mpi.doRecv(value.array(), value.arrayOffset(), len, IbisMPIInterface.TYPE_BYTE, srcRank, srcTag);
+    	    value.position(value.limit());
+        } else {
+            // TODO: improve in native code?
+            byte[] b = new byte[len];
+            mpi.doRecv(b, 0, len, IbisMPIInterface.TYPE_BYTE, srcRank, srcTag);
+            value.put(b, 0, len);
+        }
     }
 }
 
