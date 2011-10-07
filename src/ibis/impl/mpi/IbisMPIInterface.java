@@ -21,8 +21,6 @@ class IbisMPIInterface {
 
     private static final boolean DEBUG = false;
 
-    static final boolean SINGLE_THREAD = false;
-
     static final int TYPE_BOOLEAN = 1;
     
     static final int TYPE_BYTE = 2;
@@ -70,6 +68,8 @@ class IbisMPIInterface {
     private int size;
 
     private int rank;
+
+    private final boolean threadSafeMPI;
     
     private final int maxPolls;
 
@@ -89,8 +89,10 @@ class IbisMPIInterface {
             }
             int polls = properties.getIntProperty("ibis.mpi.polls", 10);
             int nanoSleepTime = properties.getIntProperty("ibis.mpi.nanosleep", 0);
+
+            boolean threadSafeMPI = properties.getBooleanProperty("ibis.mpi.threadsafe", true);
             
-            instance = new IbisMPIInterface(polls, nanoSleepTime);
+            instance = new IbisMPIInterface(polls, nanoSleepTime, threadSafeMPI);
         }
         return instance;
     }
@@ -99,9 +101,10 @@ class IbisMPIInterface {
         return instance;
     }
 
-    private IbisMPIInterface(int polls, int nanoSleepTime) {
+    private IbisMPIInterface(int polls, int nanoSleepTime, boolean threadSafeMPI) {
         this.maxPolls = polls;
         this.nanoSleepTime = nanoSleepTime;
+        this.threadSafeMPI = threadSafeMPI;
         init();
         size = size();
         rank = rank();
@@ -138,7 +141,7 @@ class IbisMPIInterface {
                         + type + " src = " + src + " tag = " + tag);
             }
 
-            if (SINGLE_THREAD) {
+            if (threadSafeMPI) {
                 return recv(buf, offset, count, type, src, tag);
             }
 
@@ -175,7 +178,7 @@ class IbisMPIInterface {
                 + type + " dest = " + dest + " tag = " + tag);
         }
 
-        if (SINGLE_THREAD) {
+        if (threadSafeMPI) {
             send(buf, offset, count, type, dest, tag);
             return;
         }
