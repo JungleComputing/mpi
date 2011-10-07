@@ -27,6 +27,8 @@ static int* ibisMPI_typeSize;
 
 static int noncopying = 1;
 
+static int threadSafe = 1;
+
 struct ibisMPI_request {
     int id;
     int isSend; /* 1 means send, 0 means recv */
@@ -53,10 +55,10 @@ static int ibisMPI_requestsUsed;
 /*
  * Class:     ibis_mpi_IbisMPI
  * Method:    init
- * Signature: ()I
+ * Signature: (Z)I
  */
 JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
-(JNIEnv *env, jobject jthis) {
+(JNIEnv *env, jobject jthis, jboolean jthreadSafe) {
     int argc = 0;
     char* a = "";
     char** argv = &a;
@@ -93,7 +95,12 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
 #endif
         return -1;
     }
+
     ibisMPI_requestsUsed = 0;
+
+    if (! jthreadSafe) {
+	threadSafe = 0;
+    }
 
 #if DEBUG	
     fprintf(stderr, "%d: MPI init done\n", ibisMPI_rank);

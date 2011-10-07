@@ -39,7 +39,7 @@ class IbisMPIInterface {
 
     static final int TYPE_COUNT = 9;
 
-    private synchronized native int init();
+    private synchronized native int init(boolean threadSafeMPI);
 
     private synchronized native int size();
 
@@ -105,7 +105,7 @@ class IbisMPIInterface {
         this.maxPolls = polls;
         this.nanoSleepTime = nanoSleepTime;
         this.threadSafeMPI = threadSafeMPI;
-        init();
+        init(threadSafeMPI);
         size = size();
         rank = rank();
     }
