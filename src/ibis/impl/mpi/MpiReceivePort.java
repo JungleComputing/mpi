@@ -38,10 +38,14 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                     // don't really want that. So, we have a thread that only
                     // checks every second.
                     for (;;) {
+                	try {
+                	    Thread.sleep(100);
+                	} catch(Throwable e) {
+                	    // ignore
+                	}
                         synchronized(port) {
                             // If there is a reader, or a message is active,
                             // continue.
-                            port.wait(100);
                             if (reader_busy || ((MpiReceivePort)port).getPortMessage() != null) {
                                 continue;
                             }
