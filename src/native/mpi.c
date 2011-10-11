@@ -110,7 +110,9 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
 }
 
 static struct ibisMPI_buf *getBuf(int sz) {
+
     struct ibisMPI_buf *p = ibisMPI_bufcache;
+
     if (p == NULL) {
 	p = (struct ibisMPI_buf *) malloc(sizeof(struct ibisMPI_buf));
 	if (p == NULL) {
@@ -118,11 +120,16 @@ static struct ibisMPI_buf *getBuf(int sz) {
 	}
 	p->next = NULL;
 	p->jbuf = NULL;
-	p->size = 16;
-	while (p->size < sz) p->size <<= 1;
-	p->buf = malloc(p->size);
-	if (p->buf == NULL) {
-	    return NULL;
+	if (sz == 0) {
+	    p->size = 0;
+	    p->buf = NULL;
+	} else {
+	    p->size = 16;
+	    while (p->size < sz) p->size <<= 1;
+	    p->buf = malloc(p->size);
+	    if (p->buf == NULL) {
+		return NULL;
+	    }
 	}
 	return p;
     }
@@ -133,10 +140,17 @@ static struct ibisMPI_buf *getBuf(int sz) {
 	return p;
     }
 
+    if (p->size == 0) {
+	p->size = 16;
+    }
     do {
 	p->size <<= 1;
     } while (p->size < sz);
-    p->buf = realloc(p->buf, p->size);
+    if (p->buf == NULL) {
+	p->buf = malloc(p->size);
+    } else {
+	p->buf = realloc(p->buf, p->size);
+    }
     if (p->buf == NULL) {
 	return NULL;
     }
@@ -145,6 +159,13 @@ static struct ibisMPI_buf *getBuf(int sz) {
 }
 
 static void releaseBuf(struct ibisMPI_buf *p) {
+    if (threadSafe) {
+	if (p->buf != NULL) {
+	    free(p->buf);
+	}
+	free(p);
+	return;
+    }
     p->jbuf = NULL;
     p->next = ibisMPI_bufcache;
     ibisMPI_bufcache = p;
