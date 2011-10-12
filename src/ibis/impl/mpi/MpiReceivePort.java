@@ -49,15 +49,21 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                             // If there is a reader, or a message is active,
                             // continue.
                             if (reader_busy || ((MpiReceivePort)port).getPortMessage() != null) {
+                        	if (logger.isDebugEnabled()) {
+                        	    logger.debug("lazy handler woke up, continues");
+                        	}
                                 continue;
                             }
                             if (in == null) {
+                        	if (logger.isDebugEnabled()) {
+                        	    logger.debug("lazy handler: in == null, exiting");
+                        	}
                                 return;
                             }
                             reader_busy = true;
                         }
                         if (logger.isInfoEnabled()) {
-                            logger.info("Lazy thread starting read ...");
+                            logger.info("lazy handler starting read ...");
                         }
                         reader(true);
                         synchronized(port) {
@@ -128,7 +134,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                     if (lazy_connectionhandler_thread && ! fromHandlerThread) {
                         // Wake up the connection handler thread so that it can die.
                         synchronized(this) {
-                    	notifyAll();
+                            notifyAll();
                         }
                     }
                     return;
