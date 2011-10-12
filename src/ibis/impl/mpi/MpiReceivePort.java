@@ -38,10 +38,12 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                     // don't really want that. So, we have a thread that only
                     // checks every second.
                     for (;;) {
-                	try {
-                	    Thread.sleep(100);
-                	} catch(Throwable e) {
-                	    // ignore
+                	synchronized(this) {
+                	    try {
+                		wait(1000);
+                	    } catch(Throwable e) {
+                		// ignore
+                	    }
                 	}
                         synchronized(port) {
                             // If there is a reader, or a message is active,
@@ -123,6 +125,12 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                                 + origin);
                     }
                     close(null);
+                    if (lazy_connectionhandler_thread && ! fromHandlerThread) {
+                        // Wake up the connection handler thread so that it can die.
+                        synchronized(this) {
+                    	notifyAll();
+                        }
+                    }
                     return;
                 case CLOSE_ONE_CONNECTION:
                     if (logger.isDebugEnabled()) {
@@ -146,7 +154,15 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                         close(null);
                         synchronized(port) {
                             processedDisconnects++;
-                            port.notifyAll();
+                            if (numDisconnects == processedDisconnects) {
+                        	port.notifyAll();
+                            }
+                        }
+                        if (lazy_connectionhandler_thread && ! fromHandlerThread) {
+                            // Wake up the connection handler thread so that it can die.
+                            synchronized(this) {
+                        	notifyAll();
+                            }
                         }
                     }
                     break;

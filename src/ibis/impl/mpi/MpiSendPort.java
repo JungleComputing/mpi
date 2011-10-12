@@ -19,7 +19,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class MpiSendPort extends SendPort implements MpiProtocol {
+    
+    private static final Logger logger
+    		= LoggerFactory.getLogger("ibis.impl.mpi.MpiSendPort");
 
     private class Conn extends SendPortConnectionInfo {
         DataOutputStream out;
@@ -85,6 +91,9 @@ class MpiSendPort extends SendPort implements MpiProtocol {
     protected void sendDisconnectMessage(ReceivePortIdentifier receiver,
             SendPortConnectionInfo conn) throws IOException {
 
+	if (logger.isDebugEnabled()) {
+	    logger.debug("Sending CLOSE_ONE_CONNECTION");	    	
+	}
         ((MpiIbis)ibis).sendDisconnect(receiver);
         out.writeByte(CLOSE_ONE_CONNECTION);
 
@@ -128,6 +137,9 @@ class MpiSendPort extends SendPort implements MpiProtocol {
     }
 
     protected void closePort() {
+	if (logger.isDebugEnabled()) {
+	    logger.debug("Sending CLOSE_ALL_CONNECTIONS");	    	
+	}
         try {
             out.writeByte(CLOSE_ALL_CONNECTIONS);
             out.close();
