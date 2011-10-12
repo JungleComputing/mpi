@@ -54,9 +54,9 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                         	}
                                 continue;
                             }
-                            if (in == null) {
+                            if (closed) {
                         	if (logger.isDebugEnabled()) {
-                        	    logger.debug("lazy handler: in == null, exiting");
+                        	    logger.debug("lazy handler: closed, exiting");
                         	}
                                 return;
                             }
