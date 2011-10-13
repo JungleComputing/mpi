@@ -39,24 +39,24 @@ class IbisMPIInterface {
 
     static final int TYPE_COUNT = 9;
 
-    private synchronized native int init(boolean threadSafeMPI);
+    private native int init(boolean threadSafeMPI);
 
-    private synchronized native int size();
+    private native int size();
 
-    private synchronized native int rank();
+    private native int rank();
 
-    private synchronized native void end();
+    private native void end();
 
-    synchronized native int send(Object buf, int offset, int count,
+    native int send(Object buf, int offset, int count,
         int type, int dest, int tag);
 
-    synchronized native int isend(Object buf, int offset, int count,
+    native int isend(Object buf, int offset, int count,
         int type, int dest, int tag, int id);
 
-    synchronized native int recv(Object buf, int offset, int count,
+    native int recv(Object buf, int offset, int count,
         int type, int src, int tag);
 
-    synchronized native int irecv(Object buf, int offset, int count,
+    native int irecv(Object buf, int offset, int count,
         int type, int src, int tag, int id);
 
     native int testAny();
@@ -90,7 +90,7 @@ class IbisMPIInterface {
             int polls = properties.getIntProperty("ibis.mpi.polls", 10);
             int nanoSleepTime = properties.getIntProperty("ibis.mpi.nanosleep", 0);
 
-            boolean threadSafeMPI = properties.getBooleanProperty("ibis.mpi.threadsafe", true);
+            boolean threadSafeMPI = properties.getBooleanProperty("ibis.mpi.threadsafe", false);
             
             instance = new IbisMPIInterface(polls, nanoSleepTime, threadSafeMPI);
         }

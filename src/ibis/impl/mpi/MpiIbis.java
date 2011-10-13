@@ -88,6 +88,10 @@ public final class MpiIbis extends ibis.ipl.impl.Ibis
             System.exit(1);
         }
 
+        if (logger.isDebugEnabled()) {
+            logger.debug("--> MpiIbis: address = " + addr);
+        }
+
         mpi = IbisMPIInterface.createMpi(properties());
 
         int size = mpi.getSize();
