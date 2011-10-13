@@ -34,13 +34,17 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
             logger.info("Started connection handler thread");
             try {
                 if (lazy_connectionhandler_thread) {
+                    int interval = 10;
                     // For disconnects, there must be a reader thread, but we
                     // don't really want that. So, we have a thread that only
                     // checks every second.
                     for (;;) {
+                	if (logger.isDebugEnabled()) {
+                	    logger.debug("lazy handler sleeping " + interval + " ms.");
+                	}
                 	synchronized(this) {
                 	    try {
-                		wait(1000);
+                		wait(interval);
                 	    } catch(Throwable e) {
                 		// ignore
                 	    }
@@ -52,6 +56,9 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                         	if (logger.isDebugEnabled()) {
                         	    logger.debug("lazy handler woke up, continues");
                         	}
+                        	if (interval < 1000) {
+                        	    interval += 10;
+                        	}
                                 continue;
                             }
                             if (closed) {
@@ -61,6 +68,7 @@ class MpiReceivePort extends ReceivePort implements MpiProtocol {
                                 return;
                             }
                             reader_busy = true;
+                            interval = 10;
                         }
                         if (logger.isInfoEnabled()) {
                             logger.info("lazy handler starting read ...");
