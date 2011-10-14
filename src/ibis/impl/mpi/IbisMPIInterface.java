@@ -97,7 +97,7 @@ class IbisMPIInterface {
         return instance;
     }
 
-    static synchronized IbisMPIInterface getMpi() {
+    static IbisMPIInterface getMpi() {
         return instance;
     }
 
@@ -105,7 +105,14 @@ class IbisMPIInterface {
         this.maxPolls = polls;
         this.nanoSleepTime = nanoSleepTime;
         this.threadSafeMPI = threadSafeMPI;
-        init(threadSafeMPI);
+        int retval = init(threadSafeMPI);
+        if (retval == -1) {
+            throw new Error("MPI initialization failed");
+        }
+        if (threadSafeMPI && retval == 0) {
+            logger.warn("Threadsafe MPI requested but not obtained. Switched to polling version");
+            threadSafeMPI = false;
+        }
         size = size();
         rank = rank();
     }
