@@ -6,7 +6,7 @@
 #include <jni.h>
 #include <stdlib.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 /* Number of tests after asynchronous send. */
 #define NUM_TESTS 10
@@ -62,8 +62,19 @@ JNIEXPORT jint JNICALL Java_ibis_impl_mpi_IbisMPIInterface_init
     int argc = 0;
     char* a = "";
     char** argv = &a;
+    int mpi_thread_env = -1;
+    int res;
+    int retval = 1;
 
-    int res = MPI_Init(&argc,&argv);
+    if (jthreadSafe) {
+	res = MPI_Init_thread(&argc,&argv, MPI_THREAD_MULTIPLE, &mpi_thread_env);
+	if (mpi_thread_env < MPI_THREAD_MULTIPLE) {
+	    jthreadSafe = 0;
+	    retval = 0;
+	}
+    } else {
+	res = MPI_Init(&argc,&argv);
+    }
     if(res != MPI_SUCCESS) return -1;
 
     res = MPI_Comm_rank(MPI_COMM_WORLD,&ibisMPI_rank);
