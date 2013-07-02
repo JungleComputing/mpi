@@ -312,13 +312,13 @@ class IbisMPIInterface {
             if (m.rank == 0) {
                 MpiDataOutputStream mout = new MpiDataOutputStream(1, 666);
                 SerializationOutput out = SerializationFactory
-                    .createSerializationOutput("ibis", mout);
+                    .createSerializationOutput("ibis", mout, System.getProperties());
                 out.writeObject("Hello, world");
                 out.close();
             } else {
                 MpiDataInputStream min = new MpiDataInputStream(0, 666);
                 SerializationInput in = SerializationFactory
-                    .createSerializationInput("ibis", min);
+                    .createSerializationInput("ibis", min, System.getProperties());
                 Object o = in.readObject();
                 in.close();
                 System.err.println("msg: " + o);
